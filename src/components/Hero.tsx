@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { fadeUp } from '../lib/animations';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const AVATARS = [
   "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop",
@@ -9,6 +11,29 @@ const AVATARS = [
 ];
 
 export function Hero() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    
+    setStatus('loading');
+    try {
+      await addDoc(collection(db, 'subscriptions'), {
+        email,
+        createdAt: serverTimestamp()
+      });
+      setStatus('success');
+      setEmail('');
+    } catch (error) {
+      console.error(error);
+      setStatus('error');
+      // Use the required error handler
+      handleFirestoreError(error, OperationType.CREATE, 'subscriptions');
+    }
+  };
+
   return (
     <section className="relative min-h-screen w-full overflow-hidden flex items-center justify-center">
       {/* Background Video */}
@@ -46,7 +71,7 @@ export function Hero() {
             ))}
           </div>
           <span className="text-sm text-muted-foreground">
-            7,000+ people already subscribed
+            10,000+ learners and creators joined
           </span>
         </motion.div>
 
@@ -55,7 +80,7 @@ export function Hero() {
           {...fadeUp(0.1)}
           className="text-5xl md:text-7xl lg:text-8xl font-medium tracking-[-2px] max-w-5xl leading-[1.02] text-foreground"
         >
-          Get <span className="font-serif italic font-normal text-foreground">Inspired</span> with Us
+          Get <span className="font-serif italic font-normal text-foreground">Expert</span> Knowledge
         </motion.h1>
 
         {/* Subhead */}
@@ -63,28 +88,32 @@ export function Hero() {
           {...fadeUp(0.25)}
           className="text-lg max-w-2xl mt-8 mx-auto text-[color:var(--color-hero-subtitle)]"
         >
-          Join our feed for meaningful updates, news around technology and a shared journey toward depth and direction.
+          Guidenza – expert-led courses and trusted knowledge from real specialists. Discover varied approaches and topics in one seamless ecosystem.
         </motion.p>
 
         {/* Form */}
         <motion.form
           {...fadeUp(0.4)}
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={handleSubmit}
           className="liquid-glass rounded-full p-2 max-w-lg w-full mt-10 md:mt-12 flex items-center gap-2 mx-auto"
         >
           <input
             type="email"
-            placeholder="Enter your email"
-            className="flex-1 bg-transparent border-none text-foreground px-4 py-2 outline-none placeholder:text-muted-foreground"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={status === 'loading'}
+            placeholder={status === 'success' ? "Thanks for subscribing!" : "Enter your email to join"}
+            className="flex-1 bg-transparent border-none text-foreground px-4 py-2 outline-none placeholder:text-muted-foreground disabled:opacity-50"
             required
           />
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
             type="submit"
-            className="bg-foreground text-background shrink-0 rounded-full px-8 py-3 text-xs font-semibold tracking-[2px] uppercase"
+            disabled={status === 'loading' || status === 'success'}
+            className="bg-foreground text-background shrink-0 rounded-full px-8 py-3 text-xs font-semibold tracking-[2px] uppercase disabled:opacity-50 transition-opacity"
           >
-            SUBSCRIBE
+            {status === 'loading' ? 'JOINING...' : status === 'success' ? 'JOINED!' : 'GET STARTED'}
           </motion.button>
         </motion.form>
       </div>

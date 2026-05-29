@@ -1,10 +1,10 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform, MotionValue } from 'framer-motion';
 
-const PARAGRAPH_1 = "We're building a space where curiosity meets clarity — where readers find depth, writers find reach, and every newsletter becomes a conversation worth having.".split(' ');
-const PARAGRAPH_2 = "A platform where content, community, and insight flow together — with less noise, less friction, and more meaning for everyone involved.".split(' ');
+const PARAGRAPH_1 = "We're building a space where expertise meets demand — where learners find depth, creators find reach, and every course becomes a transformative experience.".split(' ');
+const PARAGRAPH_2 = "A digital educational service connecting top-tier authors with eager minds, removing technical and organizational barriers for everyone involved.".split(' ');
 
-const HIGHLIGHTS = ["curiosity", "meets", "clarity"];
+const HIGHLIGHTS = ["expertise", "meets", "demand"];
 
 function Word({ 
   children, 
@@ -112,11 +112,11 @@ export function Mission() {
           </div>
 
           <div className="flex items-center gap-4 mt-16 text-xs uppercase tracking-[3px] text-muted-foreground">
-            <span>Depth</span>
+            <span>Courses</span>
             <span className="w-1 h-1 rounded-full bg-border/60" />
-            <span>Reach</span>
+            <span>Experts</span>
             <span className="w-1 h-1 rounded-full bg-border/60" />
-            <span>Meaning</span>
+            <span>Ecosystem</span>
           </div>
         </div>
       </div>

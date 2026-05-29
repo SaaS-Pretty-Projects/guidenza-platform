@@ -1,29 +1,29 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { fadeUp } from '../lib/animations';
-import { ArrowUpRight, MessageSquare, Search, Sparkles } from 'lucide-react';
+import { ArrowUpRight, GraduationCap, LayoutTemplate, ShieldCheck } from 'lucide-react';
 
 const CARDS = [
   {
-    icon: MessageSquare,
-    stat: "400M",
-    label: "weekly users",
-    name: "ChatGPT",
-    desc: "Conversational answers, not links."
+    icon: GraduationCap,
+    stat: "1,000+",
+    label: "active experts",
+    name: "Broader Choice",
+    desc: "Access a wider selection of authors, approaches, and topics in one place."
   },
   {
-    icon: Search,
-    stat: "15M",
-    label: "daily queries",
-    name: "Perplexity",
-    desc: "Cited, sourced responses in real-time."
+    icon: LayoutTemplate,
+    stat: "Zero",
+    label: "setup required",
+    name: "For Creators",
+    desc: "A ready-made system to host and monetize your knowledge easily."
   },
   {
-    icon: Sparkles,
-    stat: "2B+",
-    label: "AI overviews / mo",
-    name: "Google AI",
-    desc: "Generative overviews replacing classic search result pages."
+    icon: ShieldCheck,
+    stat: "100%",
+    label: "seamless",
+    name: "The Platform",
+    desc: "We handle the storefront, payments, and promotion so you focus on content."
   }
 ];
 
@@ -34,17 +34,17 @@ export function SearchChanged() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
         <motion.div {...fadeUp(0)} className="lg:col-span-7">
           <div className="text-xs uppercase tracking-[3px] text-muted-foreground mb-6">
-            The Shift
+            The Marketplace
           </div>
           <h2 className="text-5xl md:text-7xl lg:text-8xl font-medium tracking-[-2px] leading-[0.95]">
-            Search has <span className="font-serif italic font-normal">changed.</span><br />
+            Education has <span className="font-serif italic font-normal">evolved.</span><br />
             Have you?
           </h2>
         </motion.div>
         
         <motion.div {...fadeUp(0.2)} className="lg:col-span-5 flex items-end">
           <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-md">
-            The way people discover ideas has quietly shifted. Answers arrive synthesized, personal, and instant — and the old playbook of SEO keywords is running on borrowed time.
+            The way people consume learning has shifted. They don't want a single brand; they want a diverse marketplace of top-tier experts, seamless infrastructure, and trusted content.
           </p>
         </motion.div>
       </div>

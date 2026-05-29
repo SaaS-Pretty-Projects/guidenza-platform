@@ -1,46 +1,75 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { fadeUp } from '../lib/animations';
-import { Compass, PenLine, Users, Radio } from 'lucide-react';
+import { Compass, MonitorPlay, LayoutTemplate, Scale, CheckCircle2 } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { collection, getDocs, limit, query, doc, getDoc } from 'firebase/firestore';
+import { CoursePreview } from './CoursePreview';
+import { useAuth } from '../hooks/useAuth';
 
-const FEATURES = [
-  {
-    icon: Compass,
-    title: "Curated Feed",
-    desc: "Editorial-quality recommendations that match your pace and depth."
-  },
-  {
-    icon: PenLine,
-    title: "Writer Tools",
-    desc: "A calm canvas with the scaffolding serious writers ask for."
-  },
-  {
-    icon: Users,
-    title: "Community",
-    desc: "Thoughtful readers and creators rewarded for their attention."
-  },
-  {
-    icon: Radio,
-    title: "Distribution",
-    desc: "Reach built on signal, not noise — measured by meaning."
-  }
-];
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  author: string;
+  price: number;
+  thumbnail: string;
+  totalModules?: number;
+  categories?: string[];
+}
 
 export function Solution() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [enrolledIds, setEnrolledIds] = useState<string[]>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const q = query(collection(db, 'courses'), limit(4));
+        const snapshot = await getDocs(q);
+        const data: Course[] = [];
+        snapshot.forEach(doc => {
+          data.push({ id: doc.id, ...doc.data() } as Course);
+        });
+        setCourses(data);
+      } catch (err) {
+        console.error("Error fetching courses", err);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      const fetchEnrolled = async () => {
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          setEnrolledIds(snap.data().savedCourses || []);
+        }
+      };
+      fetchEnrolled();
+    } else {
+      setEnrolledIds([]);
+    }
+  }, [user]);
+
   return (
-    <section className="py-32 md:py-44 border-t border-border/30 px-6 md:px-8">
+    <section className="py-32 md:pt-44 border-t border-border/30 px-6 md:px-8">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-12">
         {/* Left Column - Sticky */}
         <div className="lg:col-span-5">
           <motion.div {...fadeUp(0)} className="lg:sticky lg:top-32">
             <div className="text-xs uppercase tracking-[3px] text-muted-foreground mb-6">
-              Solution
+              Value Proposition
             </div>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-[-1px] mb-6">
-              The platform for <span className="font-serif italic font-normal">meaningful</span> content
+              A platform for <span className="font-serif italic font-normal">expert</span> learning
             </h2>
             <p className="text-lg text-muted-foreground mb-10">
-              Four tools, one quiet ecosystem — built so writing, reading, and discovering all reward the same thing: depth.
+              We provide the storefront, technical environment, and payment processing while authors provide the knowledge.
             </p>
             <div className="rounded-2xl overflow-hidden aspect-video border border-border/20 bg-muted">
               <video
@@ -55,36 +84,48 @@ export function Solution() {
           </motion.div>
         </div>
 
-        {/* Right Column - Features List */}
-        <div className="lg:col-span-7 flex flex-col">
-          {FEATURES.map((feature, i) => (
-            <motion.div
-              key={i}
-              {...fadeUp(i * 0.1)}
-              className={`py-10 md:py-14 flex items-start gap-6 ${
-                i !== FEATURES.length - 1 ? 'border-b border-border/40' : ''
-              }`}
-            >
-              <div className="w-12 h-12 rounded-2xl liquid-glass flex items-center justify-center shrink-0">
-                <feature.icon size={24} strokeWidth={1.5} className="text-foreground" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-baseline justify-between mb-2">
-                  <h3 className="text-xl md:text-2xl font-semibold tracking-[-0.5px]">
-                    {feature.title}
-                  </h3>
-                  <span className="text-muted-foreground tracking-[2px] font-mono text-sm">
-                    0{i + 1}
-                  </span>
+        {/* Right Column - Course Cards */}
+        <div className="lg:col-span-7 flex flex-col gap-6">
+          <div className="text-sm uppercase tracking-[2px] text-muted-foreground mb-2">Featured Courses</div>
+          {courses.map((course, i) => {
+            const isEnrolled = enrolledIds.includes(course.id);
+            return (
+              <motion.div
+                key={course.id}
+                {...fadeUp(i * 0.1)}
+                onClick={() => setSelectedCourse(course)}
+                className="p-6 md:p-8 rounded-3xl liquid-glass border border-white/5 cursor-pointer hover:bg-white-[0.03] transition-colors group relative"
+              >
+                {isEnrolled && (
+                  <div className="absolute top-4 right-4 bg-green-500/20 text-green-400 border border-green-500/30 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    Enrolled
+                  </div>
+                )}
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="w-full md:w-32 h-32 shrink-0 rounded-2xl overflow-hidden bg-muted">
+                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <h3 className="text-xl md:text-2xl font-semibold tracking-[-0.5px] group-hover:text-foreground/80 transition-colors">
+                        {course.title}
+                      </h3>
+                    </div>
+                    <p className="text-muted-foreground text-sm mb-4">By {course.author}</p>
+                    <p className="text-muted-foreground line-clamp-2 text-sm max-w-lg mb-4">
+                      {course.description}
+                    </p>
+                    <div className="font-semibold text-foreground">${course.price}</div>
+                  </div>
                 </div>
-                <p className="text-muted-foreground text-lg">
-                  {feature.desc}
-                </p>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
+      
+      <CoursePreview course={selectedCourse} onClose={() => setSelectedCourse(null)} />
     </section>
   );
 }

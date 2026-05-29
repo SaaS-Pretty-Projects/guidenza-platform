@@ -1,0 +1,28 @@
+{
+  "entities": {
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Email subscription for the newsletter",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The subscriber's email address"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the subscription was created"
+        }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "subscriptions/{subscriptionId}": {
+      "schema": "Subscription",
+      "description": "Stores email subscriptions from the landing page"
+    }
+  }
+}

@@ -6,15 +6,15 @@ import { motion } from 'framer-motion';
 const FOOTER_LINKS = [
   {
     title: "Product",
-    links: ["How It Works", "Philosophy", "Use Cases", "Changelog"]
+    links: ["Explore", "Categories", "Pricing", "Changelog"]
   },
   {
     title: "Resources",
-    links: ["Writer Guide", "Reader FAQ", "Press Kit", "Brand"]
+    links: ["Creator Guide", "Learner FAQ", "Terms", "Brand"]
   },
   {
     title: "Company",
-    links: ["About", "Careers", "Contact", "Journal"]
+    links: ["About", "Careers", "Contact", "Blog"]
   }
 ];
 
@@ -28,7 +28,7 @@ export function Footer() {
           <div className="lg:col-span-5 flex flex-col gap-8">
             <Logo />
             <p className="text-muted-foreground text-lg max-w-sm">
-              A quieter internet for readers and writers. Meaningful updates, every week.
+              Guidenza – trusted knowledge from real specialists. A single platform for expert learning.
             </p>
             <div className="flex items-center gap-2">
               {[Instagram, Linkedin, Twitter].map((Icon, i) => (
@@ -69,7 +69,7 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <p>© 2026 Mindloop. All rights reserved.</p>
+          <p>© 2026 Guidenza. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms</a>
@@ -84,7 +84,7 @@ export function Footer() {
         aria-hidden="true"
       >
         <span className="text-[18vw] leading-none font-serif italic text-foreground/[0.04] tracking-[-0.02em]">
-          mindloop
+          guidenza
         </span>
       </div>
     </footer>
