@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, TrendingUp, TrendingDown, Star, Search } from 'lucide-react';
+import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, TrendingUp, TrendingDown, Star, Search, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Helmet } from 'react-helmet-async';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { motion } from 'framer-motion';
 
 interface Course {
   id: string;
@@ -16,12 +17,13 @@ interface Course {
   thumbnail: string;
   categories?: string[];
   totalModules?: number;
+  status?: 'Draft' | 'Live' | 'Archived';
 }
 
-const MOCK_TREND_DATA = Array.from({ length: 30 }).map((_, i) => {
+const MOCK_TREND_DATA = Array.from({ length: 90 }).map((_, i) => {
   const date = new Date();
-  date.setDate(date.getDate() - (29 - i));
-  const students = Math.floor(Math.random() * 20) + 10 + (i * 2);
+  date.setDate(date.getDate() - (89 - i));
+  const students = Math.floor(Math.random() * 20) + 10 + Math.floor(i / 3) * 2;
   return {
     date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     students: students,
@@ -72,6 +74,12 @@ export function InstructorDashboard() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState<'title' | 'price' | 'studentCount' | 'revenue'>('revenue');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [trendRange, setTrendRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -183,6 +191,55 @@ export function InstructorDashboard() {
     }
   };
 
+  const handleUpdateStatus = async (courseId: string, status: 'Draft' | 'Live' | 'Archived') => {
+    try {
+      setUpdatingStatus(courseId);
+      const courseRef = doc(db, 'courses', courseId);
+      await updateDoc(courseRef, { status });
+      setCourses(courses.map(c => c.id === courseId ? { ...c, status } : c));
+      toast.success(`Course marked as ${status}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update course status");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const toggleCourseSelection = (courseId: string) => {
+    setSelectedCourses(prev => 
+      prev.includes(courseId) ? prev.filter(id => id !== courseId) : [...prev, courseId]
+    );
+  };
+
+  const toggleAllCourses = () => {
+    if (selectedCourses.length === filteredCourses.length) {
+      setSelectedCourses([]);
+    } else {
+      setSelectedCourses(filteredCourses.map(c => c.id));
+    }
+  };
+
+  const handleBatchStatusUpdate = async (status: 'Draft' | 'Live' | 'Archived') => {
+    if (selectedCourses.length === 0) return;
+    try {
+      setIsBatchUpdating(true);
+      const updates = selectedCourses.map(id => {
+        const courseRef = doc(db, 'courses', id);
+        return updateDoc(courseRef, { status });
+      });
+      await Promise.all(updates);
+      setCourses(courses.map(c => selectedCourses.includes(c.id) ? { ...c, status } : c));
+      toast.success(`${selectedCourses.length} courses marked as ${status}`);
+      setSelectedCourses([]);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update courses');
+    } finally {
+      setIsBatchUpdating(false);
+    }
+  };
+
   if (loading || fetching) {
     return <div className="min-h-screen pt-32 px-6 flex items-center justify-center text-muted-foreground">Loading dashboard...</div>;
   }
@@ -205,6 +262,15 @@ export function InstructorDashboard() {
   const totalStudents = enrichedCourses.reduce((acc, c) => acc + c.studentCount, 0);
   const totalRevenue = enrichedCourses.reduce((acc, c) => acc + c.revenue, 0);
 
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'short' });
+  const prevMonth1 = new Date(new Date().setMonth(new Date().getMonth() - 1)).toLocaleString('en-US', { month: 'short' });
+  const prevMonth2 = new Date(new Date().setMonth(new Date().getMonth() - 2)).toLocaleString('en-US', { month: 'short' });
+  const MOCK_REVENUE_GROWTH = [
+    { month: prevMonth2, revenue: Math.round(totalRevenue * 0.6) || 12000 },
+    { month: prevMonth1, revenue: Math.round(totalRevenue * 0.8) || 15500 },
+    { month: currentMonth, revenue: totalRevenue > 0 ? totalRevenue : 18000 }
+  ];
+
   // Top Performing Highlights
   const topEnrolledCourse = enrichedCourses.length > 0 
     ? enrichedCourses.reduce((prev, current) => (prev.studentCount > current.studentCount) ? prev : current) 
@@ -221,6 +287,29 @@ export function InstructorDashboard() {
   const filteredCourses = enrichedCourses.filter(course =>
     course.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const sortedCourses = [...filteredCourses].sort((a, b) => {
+    let aVal = a[sortColumn];
+    let bVal = b[sortColumn];
+    
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (column: 'title' | 'price' | 'studentCount' | 'revenue') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection(column === 'title' ? 'asc' : 'desc');
+    }
+  };
 
   return (
     <div className="min-h-screen pt-32 pb-20 px-6 max-w-7xl mx-auto">
@@ -244,15 +333,25 @@ export function InstructorDashboard() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="liquid-glass p-6 rounded-3xl border border-white/5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="liquid-glass p-6 rounded-3xl border border-white/5"
+        >
           <div className="flex items-center gap-3 text-muted-foreground mb-4">
             <BookOpen size={20} />
             <span className="font-medium">Total Courses</span>
           </div>
           <div className="text-4xl font-semibold">{courses.length}</div>
-        </div>
-        <div className="liquid-glass p-6 rounded-3xl border border-white/5">
+        </motion.div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="liquid-glass p-6 rounded-3xl border border-white/5"
+        >
           <div className="flex items-center gap-3 text-muted-foreground mb-4">
             <Users size={20} />
             <span className="font-medium">Total Students</span>
@@ -266,8 +365,31 @@ export function InstructorDashboard() {
               </div>
             )}
           </div>
-        </div>
-        <div className="liquid-glass p-6 rounded-3xl border border-white/5">
+        </motion.div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="liquid-glass p-6 rounded-3xl border border-white/5"
+        >
+          <div className="flex items-center gap-3 text-muted-foreground mb-4">
+            <CheckCircle size={20} />
+            <span className="font-medium">Completion Rate</span>
+          </div>
+          <div className="flex items-end gap-3">
+            <div className="text-4xl font-semibold">68%</div>
+            <div className="flex items-center gap-1 text-sm font-medium mb-1 text-green-400">
+              <TrendingUp size={16} />
+              <span>+4%</span>
+            </div>
+          </div>
+        </motion.div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="liquid-glass p-6 rounded-3xl border border-white/5"
+        >
           <div className="flex items-center gap-3 text-muted-foreground mb-4">
             <DollarSign size={20} />
             <span className="font-medium">Total Revenue</span>
@@ -287,7 +409,32 @@ export function InstructorDashboard() {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="liquid-glass p-6 rounded-3xl border border-white/5"
+        >
+          <div className="flex items-center gap-3 text-muted-foreground mb-4">
+            <TrendingUp size={20} />
+            <span className="font-medium">Revenue Growth</span>
+          </div>
+          <div className="h-20 w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={MOCK_REVENUE_GROWTH} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }} 
+                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} 
+                  itemStyle={{ color: '#4ade80' }} 
+                  formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
+                  labelStyle={{ color: '#a1a1aa', fontSize: '12px' }}
+                />
+                <Bar dataKey="revenue" fill="#4ade80" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
       </div>
 
       {/* Top Performing */}
@@ -323,10 +470,32 @@ export function InstructorDashboard() {
       )}
 
       <div className="mb-12 liquid-glass p-6 rounded-3xl border border-white/5">
-        <h2 className="text-xl font-semibold mb-6">Enrollment Trends (Last 30 Days)</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <h2 className="text-xl font-semibold">Enrollment Trends</h2>
+          <div className="flex bg-white/5 rounded-full p-1 border border-white/10">
+            <button 
+              onClick={() => setTrendRange('7d')}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${trendRange === '7d' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              7 Days
+            </button>
+            <button 
+              onClick={() => setTrendRange('30d')}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${trendRange === '30d' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              30 Days
+            </button>
+            <button 
+              onClick={() => setTrendRange('90d')}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${trendRange === '90d' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              90 Days
+            </button>
+          </div>
+        </div>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={MOCK_TREND_DATA} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+            <LineChart data={MOCK_TREND_DATA.slice(-(trendRange === '7d' ? 7 : trendRange === '30d' ? 30 : 90))} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
               <XAxis dataKey="date" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
@@ -340,7 +509,36 @@ export function InstructorDashboard() {
       {enrichedCourses.length > 0 && (
         <div className="mb-12 liquid-glass p-6 rounded-3xl border border-white/5 overflow-x-auto">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-            <h2 className="text-xl font-semibold">Revenue Breakdown</h2>
+            <div className="flex items-center gap-4 flex-wrap">
+              <h2 className="text-xl font-semibold">Revenue Breakdown</h2>
+              {selectedCourses.length > 0 && (
+                <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
+                  <span className="text-sm font-medium">{selectedCourses.length} selected</span>
+                  <div className="h-4 w-px bg-white/20 mx-1"></div>
+                  <button 
+                    disabled={isBatchUpdating}
+                    onClick={() => handleBatchStatusUpdate('Live')}
+                    className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors disabled:opacity-50"
+                  >
+                    Set Live
+                  </button>
+                  <button 
+                    disabled={isBatchUpdating}
+                    onClick={() => handleBatchStatusUpdate('Draft')}
+                    className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition-colors disabled:opacity-50"
+                  >
+                    Set Draft
+                  </button>
+                  <button 
+                    disabled={isBatchUpdating}
+                    onClick={() => handleBatchStatusUpdate('Archived')}
+                    className="text-xs px-2 py-1 rounded bg-zinc-500/20 text-zinc-400 hover:bg-zinc-500/30 transition-colors disabled:opacity-50"
+                  >
+                    Archive
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="relative">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -355,17 +553,76 @@ export function InstructorDashboard() {
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="border-b border-white/10 text-muted-foreground">
-                <th className="pb-4 font-medium pl-4">Course Name</th>
-                <th className="pb-4 font-medium">Price</th>
-                <th className="pb-4 font-medium">Students</th>
-                <th className="pb-4 font-medium text-right pr-4">Revenue</th>
+                <th className="pb-4 pl-4 font-medium w-12">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-white/20 bg-white/5 accent-white cursor-pointer w-4 h-4"
+                    checked={selectedCourses.length > 0 && selectedCourses.length === filteredCourses.length}
+                    onChange={toggleAllCourses}
+                  />
+                </th>
+                <th className="pb-4 font-medium">
+                  <button 
+                    onClick={() => handleSort('title')} 
+                    className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Course Name
+                    {sortColumn === 'title' && (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                  </button>
+                </th>
+                <th className="pb-4 font-medium">
+                  <button 
+                    onClick={() => handleSort('price')} 
+                    className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Price
+                    {sortColumn === 'price' && (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                  </button>
+                </th>
+                <th className="pb-4 font-medium">
+                  <button 
+                    onClick={() => handleSort('studentCount')} 
+                    className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Students
+                    {sortColumn === 'studentCount' && (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                  </button>
+                </th>
+                <th className="pb-4 font-medium text-right pr-4">
+                  <button 
+                    onClick={() => handleSort('revenue')} 
+                    className="flex items-center gap-1 w-full justify-end hover:text-foreground transition-colors"
+                  >
+                    Revenue
+                    {sortColumn === 'revenue' && (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredCourses.length > 0 ? (
-                filteredCourses.map((course) => (
+              {sortedCourses.length > 0 ? (
+                sortedCourses.map((course) => (
                   <tr key={course.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-4 pl-4 font-medium">{course.title}</td>
+                    <td className="py-4 pl-4">
+                      <input 
+                        type="checkbox"
+                        className="rounded border-white/20 bg-white/5 accent-white cursor-pointer w-4 h-4"
+                        checked={selectedCourses.includes(course.id)}
+                        onChange={() => toggleCourseSelection(course.id)}
+                      />
+                    </td>
+                    <td className="py-4 font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{course.title}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                          (course.status || 'Live') === 'Live' ? 'bg-green-500/20 text-green-400' :
+                          (course.status || 'Live') === 'Draft' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-zinc-500/20 text-zinc-400'
+                        }`}>
+                          {course.status || 'Live'}
+                        </span>
+                      </div>
+                    </td>
                     <td className="py-4">${course.price}</td>
                     <td className="py-4">{course.studentCount}</td>
                     <td className="py-4 text-right pr-4 font-semibold text-green-400">${course.revenue.toLocaleString()}</td>
@@ -373,7 +630,7 @@ export function InstructorDashboard() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
                     No courses found matching "{searchQuery}"
                   </td>
                 </tr>
@@ -401,6 +658,34 @@ export function InstructorDashboard() {
             <div key={course.id} className="liquid-glass rounded-3xl border border-white/5 overflow-hidden group">
               <div className="h-48 bg-muted relative">
                 <img src={course.thumbnail || "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=800"} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute top-4 left-4 z-10 group/dropdown">
+                  <div className={`px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 cursor-pointer backdrop-blur-md border shadow-sm transition-colors ${
+                    (course.status || 'Live') === 'Live' ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30' :
+                    (course.status || 'Live') === 'Draft' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30' :
+                    'bg-zinc-500/20 text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/30'
+                  }`}>
+                    {course.status || 'Live'}
+                    {updatingStatus === course.id ? (
+                      <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin ml-1 opacity-50" />
+                    ) : (
+                      <ChevronDown size={12} className="opacity-50 ml-1" />
+                    )}
+                  </div>
+                  
+                  {/* Dropdown Menu */}
+                  <div className="absolute top-full left-0 mt-2 w-32 bg-[#18181b] border border-white/10 rounded-xl shadow-xl overflow-hidden opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all">
+                    {['Live', 'Draft', 'Archived'].map(status => (
+                      <button
+                        key={status}
+                        disabled={updatingStatus === course.id}
+                        onClick={() => handleUpdateStatus(course.id, status as any)}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 transition-colors ${(course.status || 'Live') === status ? 'text-white' : 'text-muted-foreground'}`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => {
