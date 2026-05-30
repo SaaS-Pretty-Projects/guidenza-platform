@@ -1,246 +1,31 @@
-# Org-level CircleCI config template for SaaS-Pretty-Projects
-# Stack: React + Vite + TypeScript + Tailwind + Firebase + Hostinger
-#
-# Steps to activate:
-#   1. Install CircleCI GitHub app: https://github.com/marketplace/circleci
-#      (select SaaS-Pretty-Projects org, grant access to repos)
-#   2. Copy this template into each repo as .circleci/config.yml
-#   3. Configure environment variables in CircleCI org Context or per-project
-#
-# Required env vars (set in CircleCI org-level "spp-deploy" context):
-#   - HOSTINGER_API_TOKEN  — Hostinger API token for deployments
-#   - FIREBASE_TOKEN        — Firebase CI token (firebase login:ci)
-#   - GITHUB_TOKEN          — GH_PAT with repo + workflow scopes
-
+# Use the latest 2.1 version of CircleCI pipeline process engine.
+# See: https://circleci.com/docs/reference/configuration-reference
 version: 2.1
 
-# ──────────────────────────────────────────────────────────────
-# Orbs — shared toolkits
-# ──────────────────────────────────────────────────────────────
-orbs:
-  node: circleci/node@7.1.0
-
-# ──────────────────────────────────────────────────────────────
-# Commands — reusable step sequences
-# ──────────────────────────────────────────────────────────────
-commands:
-  install-deps:
-    description: "Install npm dependencies with caching"
-    parameters:
-      node-version:
-        type: string
-        default: "22"
-    steps:
-      - node/install:
-          node-version: << parameters.node-version >>
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: v1
-          cache-path: ~/.npm
-          include-branch-in-cache-key: false
-          override-ci-command: npm ci || npm install
-
-  type-check:
-    description: "Run TypeScript type checking"
-    steps:
-      - run:
-          name: TypeScript check
-          command: |
-            if [ -f tsconfig.json ]; then
-              npx tsc --noEmit 2>&1 || true
-            else
-              echo "No tsconfig.json — skipping type check"
-            fi
-
-  lint:
-    description: "Run linter"
-    steps:
-      - run:
-          name: Lint
-          command: |
-            if jq -e '.scripts.lint' package.json > /dev/null 2>&1; then
-              npm run lint
-            elif jq -e '.scripts.eslint' package.json > /dev/null 2>&1; then
-              npm run eslint
-            else
-              echo "No lint script found — skipping"
-            fi
-
-  test:
-    description: "Run tests"
-    steps:
-      - run:
-          name: Test
-          command: |
-            if jq -e '.scripts.test' package.json > /dev/null 2>&1; then
-              npm run test -- --reporter=junit --reporter-output=./test-results/junit.xml 2>/dev/null || \
-              npm run test
-            else
-              echo "No test script found — skipping"
-            fi
-      - store_test_results:
-          path: ./test-results
-
-  build:
-    description: "Build the project"
-    steps:
-      - run:
-          name: Build
-          command: |
-            if jq -e '.scripts.build' package.json > /dev/null 2>&1; then
-              npm run build
-            else
-              echo "No build script — skipping"
-            fi
-
-  deploy-hostinger-custom:
-    description: "Deploy to Hostinger via project's deploy script"
-    steps:
-      - run:
-          name: Deploy to Hostinger
-          command: |
-            if [ -f scripts/deploy.mjs ]; then
-              node scripts/deploy.mjs
-            elif [ -f deploy.sh ]; then
-              bash deploy.sh
-            elif jq -e '.scripts.deploy' package.json > /dev/null 2>&1; then
-              npm run deploy
-            else
-              echo "No custom deploy script found — deploying via static archive"
-            fi
-
-  deploy-firebase:
-    description: "Deploy Firebase Hosting + Functions"
-    steps:
-      - run:
-          name: Deploy to Firebase
-          command: |
-            if [ -f firebase.json ]; then
-              npx firebase-tools deploy --only hosting --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_TOKEN" || \
-              echo "Firebase deploy skipped (check FIREBASE_PROJECT_ID)"
-            else
-              echo "No firebase.json — skipping Firebase deploy"
-            fi
-
-  deploy-cf-worker:
-    description: "Deploy Cloudflare Worker"
-    steps:
-      - run:
-          name: Deploy Cloudflare Worker
-          command: |
-            if [ -d worker/src ] || [ -d workers ]; then
-              npx wrangler deploy 2>/dev/null || \
-              npm run deploy:worker 2>/dev/null || \
-              echo "No Cloudflare Worker config found — skipping"
-            fi
-
-# ──────────────────────────────────────────────────────────────
-# Executors
-# ──────────────────────────────────────────────────────────────
-executors:
-  node-executor:
-    docker:
-      - image: cimg/node:22.14
-    resource_class: medium
-    working_directory: ~/repo
-
-# ──────────────────────────────────────────────────────────────
-# Jobs
-# ──────────────────────────────────────────────────────────────
+# Define a job to be invoked later in a workflow.
+# See: https://circleci.com/docs/guides/orchestrate/jobs-steps/#jobs-overview & https://circleci.com/docs/reference/configuration-reference/#jobs
 jobs:
-  build-and-test:
-    description: "Standard build + test pipeline"
-    parameters:
-      node-version:
-        type: string
-        default: "22"
-      run-typecheck:
-        type: boolean
-        default: true
-      run-lint:
-        type: boolean
-        default: true
-      run-test:
-        type: boolean
-        default: true
-    executor:
-      name: node-executor
-    steps:
-      - checkout
-      - install-deps:
-          node-version: << parameters.node-version >>
-      - when:
-          condition: << parameters.run-typecheck >>
-          steps:
-            - type-check
-      - when:
-          condition: << parameters.run-lint >>
-          steps:
-            - lint
-      - when:
-          condition: << parameters.run-test >>
-          steps:
-            - test
-      - build
-      - persist_to_workspace:
-          root: ~/repo
-          paths:
-            - dist
-            - build
-            - .next
-            - out
+  say-hello:
+    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
+    # See: https://circleci.com/docs/guides/execution-managed/executor-intro/ & https://circleci.com/docs/reference/configuration-reference/#executor-job
+    docker:
+      # Specify the version you desire here
+      # See: https://circleci.com/developer/images/image/cimg/base
+      - image: cimg/base:current
 
-  deploy:
-    description: "Deploy to all configured targets"
-    executor:
-      name: node-executor
+    # Add steps to the job
+    # See: https://circleci.com/docs/guides/orchestrate/jobs-steps/#steps-overview & https://circleci.com/docs/reference/configuration-reference/#steps
     steps:
+      # Checkout the code as the first step.
       - checkout
-      - attach_workspace:
-          at: ~/repo
-      - install-deps
-      - deploy-hostinger-custom
-      - deploy-firebase
-      - deploy-cf-worker
+      - run:
+          name: "Say hello"
+          command: "echo Hello, World!"
 
-# ──────────────────────────────────────────────────────────────
-# Workflows
-# ──────────────────────────────────────────────────────────────
+# Orchestrate jobs using workflows
+# See: https://circleci.com/docs/guides/orchestrate/workflows/ & https://circleci.com/docs/reference/configuration-reference/#workflows
 workflows:
-  version: 2
-
-  # Main CI — runs on every push and PR
-  ci:
+  say-hello-workflow: # This is the name of the workflow, feel free to change it to better match your workflow.
+    # Inside the workflow, you define the jobs you want to run.
     jobs:
-      - build-and-test:
-          context: spp-deploy
-          filters:
-            tags:
-              only: /.*/
-
-      - deploy:
-          context: spp-deploy
-          requires:
-            - build-and-test
-          filters:
-            branches:
-              only:
-                - main
-                - master
-                - develop
-            tags:
-              only: /^v.*/
-
-  # Nightly — scheduled full test suite
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 6 * * *"
-          filters:
-            branches:
-              only:
-                - main
-                - master
-    jobs:
-      - build-and-test:
-          context: spp-deploy
+      - say-hello
