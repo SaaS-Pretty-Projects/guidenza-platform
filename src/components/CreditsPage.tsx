@@ -8,6 +8,8 @@ import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 const CREDIT_PACKS = [
   { id: 'pack_500', credits: 500, price: 5, label: 'Starter', popular: false },
   { id: 'pack_2500', credits: 2500, price: 20, label: 'Growth', popular: true, savings: '17%' },
@@ -80,20 +82,28 @@ export function CreditsPage() {
     fetchTransactions();
   }, [user]);
 
-  const handlePurchase = (packId: string) => {
+  const handlePurchase = async (packId: string) => {
     if (!user) {
       login();
       return;
     }
     const pack = CREDIT_PACKS.find(p => p.id === packId);
     if (!pack) return;
-    // SafePay checkout redirect
-    const checkoutUrl = `/api/checkout?pack=${packId}&uid=${user.uid}`;
-    window.open(checkoutUrl, '_blank');
-    toast.success(`Redirecting to payment for ${pack.credits} credits...`);
+    try {
+      const res = await fetch(`${API_BASE}/api/checkout?pack=${packId}&uid=${user.uid}`);
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, '_blank');
+        toast.success(`Redirecting to payment for ${pack.credits} credits...`);
+      } else {
+        toast.error(data.error || 'Failed to create checkout session');
+      }
+    } catch {
+      toast.error('Failed to connect to payment service');
+    }
   };
 
-  const handleSubscribe = (tierId: string) => {
+  const handleSubscribe = async (tierId: string) => {
     if (!user) {
       login();
       return;
@@ -102,9 +112,18 @@ export function CreditsPage() {
       window.open('mailto:support@guidenza.com?subject=Enterprise%20Plan%20Inquiry', '_blank');
       return;
     }
-    const checkoutUrl = `/api/subscribe?tier=${tierId}&uid=${user.uid}`;
-    window.open(checkoutUrl, '_blank');
-    toast.success('Redirecting to subscription checkout...');
+    try {
+      const res = await fetch(`${API_BASE}/api/subscribe?tier=${tierId}&uid=${user.uid}`);
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, '_blank');
+        toast.success('Redirecting to subscription checkout...');
+      } else {
+        toast.error(data.error || 'Failed to create subscription');
+      }
+    } catch {
+      toast.error('Failed to connect to payment service');
+    }
   };
 
   if (!user) {
