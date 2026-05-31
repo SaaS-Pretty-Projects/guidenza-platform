@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PlayCircle, BookOpen, Clock, CheckCircle2, Heart, Star, Download } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
-import { db } from '../lib/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useCredits } from '../contexts/CreditsContext';
+import { db, auth } from '../lib/firebase';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -36,6 +39,7 @@ interface CoursePreviewProps {
 
 export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const { user } = useAuth();
+  const { spend, tier } = useCredits();
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [completedModules, setCompletedModules] = useState(0);
@@ -97,6 +101,17 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       toast.error("Please sign in to enroll!");
       return;
     }
+    const price = course?.price || 0;
+    const creditCost = price * 100;
+    let creditsDeducted = false;
+    if (price > 0 && tier === 'free') {
+      const success = await spend(creditCost, `Enrolled in: ${course?.title}`);
+      if (!success) {
+        toast.error(`Need ${creditCost} credits to enroll. Visit Credits page to top up.`);
+        return;
+      }
+      creditsDeducted = true;
+    }
     toast.loading("Enrolling...", { id: "enroll" });
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -106,7 +121,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       }).catch(async (e) => {
         if (e.code === 'not-found') {
           const { setDoc } = await import('firebase/firestore');
-          await setDoc(userRef, { savedCourses: [course?.id], progress: { [course?.id as string]: 1 }, wishlist: [] });
+          await setDoc(userRef, { savedCourses: [course?.id], progress: { [course?.id as string]: 1 }, wishlist: [], credits: 0 });
         } else {
           throw e;
         }
@@ -116,6 +131,16 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       toast.success("Successfully enrolled!", { id: "enroll" });
     } catch (err) {
       console.error("Error saving course", err);
+      if (creditsDeducted) {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          await fetch(`${API_BASE}/api/refund`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({ amount: creditCost, description: `Refund: enrollment failed for ${course?.title}` }),
+          });
+        }
+      }
       toast.error("Failed to enroll.", { id: "enroll" });
     }
   };
@@ -139,7 +164,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
         }).catch(async (e) => {
           if (e.code === 'not-found') {
             const { setDoc } = await import('firebase/firestore');
-            await setDoc(userRef, { wishlist: [course.id], savedCourses: [], progress: {} });
+            await setDoc(userRef, { wishlist: [course.id], savedCourses: [], progress: {}, credits: 0 });
           } else {
             throw e;
           }
@@ -262,6 +287,12 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
           <Helmet>
             <title>{course.title} | Guidenza</title>
             <meta name="description" content={course.description} />
+            <meta property="og:title" content={`${course.title} | Guidenza`} />
+            <meta property="og:description" content={course.description} />
+            <meta property="og:type" content="product" />
+            {course.thumbnail && <meta property="og:image" content={course.thumbnail} />}
+            {course.price > 0 && <meta property="product:price:amount" content={String(course.price)} />}
+            <meta property="product:price:currency" content="USD" />
           </Helmet>
           <motion.div
             initial={{ opacity: 0 }}
