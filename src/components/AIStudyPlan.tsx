@@ -7,6 +7,7 @@ import { useRateLimit } from '../hooks/useRateLimit';
 import { GoogleGenAI } from '@google/genai';
 import toast from 'react-hot-toast';
 import { Helmet } from 'react-helmet-async';
+import DOMPurify from 'dompurify';
 
 const STUDY_PLAN_COST = 100;
 
@@ -166,7 +167,7 @@ Format as clean markdown. Be specific and practical.`;
               Generate Another Plan
             </button>
             <div className="liquid-glass rounded-2xl border border-white/5 p-6 sm:p-8 prose prose-invert prose-sm max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: plan.replace(/\n/g, '<br/>').replace(/#{1,3}\s(.+)/g, '<h3>$1</h3>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') }} />
+              <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(plan.replace(/\n/g, '<br/>').replace(/#{1,3}\s(.+)/g, '<h3>$1</h3>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')) }} />
             </div>
           </div>
         )}

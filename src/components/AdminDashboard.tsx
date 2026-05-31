@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, query, orderBy, limit, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, query, orderBy, limit, where } from 'firebase/firestore';
 import { Users, DollarSign, BookOpen, Shield, Search, CreditCard, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
@@ -24,8 +24,6 @@ interface PlatformStats {
   activeSubscriptions: number;
 }
 
-const ADMIN_EMAILS = ['wysness@gmail.com'];
-
 export function AdminDashboard() {
   const { user, loading } = useAuth();
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -34,12 +32,24 @@ export function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'courses' | 'withdrawals'>('overview');
   const [creditAdjust, setCreditAdjust] = useState<{ userId: string; amount: string } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      setFetching(false);
+      return;
+    }
+    const checkAdmin = async () => {
+      const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+      setIsAdmin(adminDoc.exists());
+      if (!adminDoc.exists()) setFetching(false);
+    };
+    checkAdmin();
+  }, [user]);
 
   useEffect(() => {
     if (!isAdmin) {
-      setFetching(false);
       return;
     }
 
