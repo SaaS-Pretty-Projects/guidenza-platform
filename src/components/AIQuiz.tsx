@@ -4,7 +4,10 @@ import { Brain, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { useCredits } from '../contexts/CreditsContext';
 import { useRateLimit } from '../hooks/useRateLimit';
 import { GoogleGenAI } from '@google/genai';
+import { auth } from '../lib/firebase';
 import toast from 'react-hot-toast';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const QUIZ_COST = 75;
 
@@ -21,7 +24,7 @@ interface AIQuizProps {
 }
 
 export function AIQuiz({ courseTitle, courseDescription }: AIQuizProps) {
-  const { credits, spend, addCredits, canAfford, tier } = useCredits();
+  const { credits, spend, canAfford, tier } = useCredits();
   const rateLimiter = useRateLimit({ key: 'ai_quiz', maxPerDay: 5 });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
@@ -78,7 +81,14 @@ Make questions progressively harder. Include practical application questions.`;
     } catch (err) {
       console.error('Quiz generation error:', err);
       if (creditsDeducted) {
-        await addCredits(QUIZ_COST, 'Refund: quiz generation failed', 'refund');
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          await fetch(`${API_BASE}/api/refund`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({ amount: QUIZ_COST, description: 'Refund: quiz generation failed' }),
+          });
+        }
       }
       toast.error('Failed to generate quiz. Please try again.');
     } finally {

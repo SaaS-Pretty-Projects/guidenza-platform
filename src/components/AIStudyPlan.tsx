@@ -5,7 +5,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCredits } from '../contexts/CreditsContext';
 import { useRateLimit } from '../hooks/useRateLimit';
 import { GoogleGenAI } from '@google/genai';
+import { auth } from '../lib/firebase';
 import toast from 'react-hot-toast';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 import { Helmet } from 'react-helmet-async';
 import DOMPurify from 'dompurify';
 
@@ -13,7 +16,7 @@ const STUDY_PLAN_COST = 100;
 
 export function AIStudyPlan() {
   const { user } = useAuth();
-  const { credits, spend, addCredits, canAfford, tier } = useCredits();
+  const { credits, spend, canAfford, tier } = useCredits();
   const rateLimiter = useRateLimit({ key: 'ai_study_plan', maxPerDay: 3 });
   const [goal, setGoal] = useState('');
   const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
@@ -74,7 +77,14 @@ Format as clean markdown. Be specific and practical.`;
     } catch (err) {
       console.error('Study plan generation error:', err);
       if (creditsDeducted) {
-        await addCredits(STUDY_PLAN_COST, 'Refund: study plan generation failed', 'refund');
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          await fetch(`${API_BASE}/api/refund`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({ amount: STUDY_PLAN_COST, description: 'Refund: study plan generation failed' }),
+          });
+        }
       }
       toast.error('Failed to generate study plan');
     } finally {

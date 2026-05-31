@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, PlayCircle, BookOpen, Clock, CheckCircle2, Heart, Star, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCredits } from '../contexts/CreditsContext';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -37,7 +39,7 @@ interface CoursePreviewProps {
 
 export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const { user } = useAuth();
-  const { spend, tier, addCredits } = useCredits();
+  const { spend, tier } = useCredits();
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [completedModules, setCompletedModules] = useState(0);
@@ -130,7 +132,14 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     } catch (err) {
       console.error("Error saving course", err);
       if (creditsDeducted) {
-        await addCredits(creditCost, `Refund: enrollment failed for ${course?.title}`, 'refund');
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          await fetch(`${API_BASE}/api/refund`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({ amount: creditCost, description: `Refund: enrollment failed for ${course?.title}` }),
+          });
+        }
       }
       toast.error("Failed to enroll.", { id: "enroll" });
     }
