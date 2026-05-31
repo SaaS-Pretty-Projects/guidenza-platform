@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PlayCircle, BookOpen, Clock, CheckCircle2, Heart, Star, Download } from 'lucide-react';
+import { X, PlayCircle, CheckCircle2, Heart, Star, Download } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { jsPDF } from 'jspdf';
+import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, CourseModule } from '../lib/learningData';
 
 interface Course {
   id: string;
@@ -18,6 +19,7 @@ interface Course {
   thumbnail: string;
   totalModules?: number;
   categories?: string[];
+  modules?: CourseModule[];
 }
 
 interface Review {
@@ -43,6 +45,9 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'highest' | 'lowest'>('newest');
+  const [moduleList, setModuleList] = useState<CourseModule[]>([]);
+  const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
+  const [markingDone, setMarkingDone] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && course) {
@@ -51,15 +56,20 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
         const snap = await getDoc(userRef);
         if (snap.exists()) {
           const data = snap.data();
-          const savedCourses = data.savedCourses || [];
-          const wishlist = data.wishlist || [];
-          setIsEnrolled(savedCourses.includes(course.id));
+          const enrolledCourses: string[] = data.enrolledCourses || [];
+          const wishlist: string[] = data.wishlist || [];
+          const enrolled = enrolledCourses.includes(course.id);
+          setIsEnrolled(enrolled);
           setIsWishlisted(wishlist.includes(course.id));
-          
-          if (data.progress && data.progress[course.id]) {
-            setCompletedModules(data.progress[course.id]);
+
+          if (enrolled) {
+            const progress = await getProgressForCourse(user.uid, course.id);
+            const completed = progress?.completedModules ?? [];
+            setCompletedModuleIds(completed);
+            setCompletedModules(completed.length);
           } else {
             setCompletedModules(0);
+            setCompletedModuleIds([]);
           }
         }
       };
@@ -92,31 +102,32 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     }
   }, [course]);
 
+  // Effect: derive moduleList from course (sync only)
+  useEffect(() => {
+    if (!course) { setModuleList([]); return; }
+    setModuleList(course.modules ?? []);
+  }, [course]);
+
+  // Effect: streak tracking — fires when enrollment confirmed
+  useEffect(() => {
+    if (user && isEnrolled && course) {
+      recordCourseOpen(user.uid).catch(console.error);
+    }
+  }, [user?.uid, course?.id]);
+
   const handleSaveCourse = async () => {
-    if (!user) {
-      toast.error("Please sign in to enroll!");
+    if (!user || !course) {
+      toast.error('Please sign in to enroll!');
       return;
     }
-    toast.loading("Enrolling...", { id: "enroll" });
+    toast.loading('Enrolling...', { id: 'enroll' });
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        savedCourses: arrayUnion(course?.id),
-        [`progress.${course?.id}`]: 1
-      }).catch(async (e) => {
-        if (e.code === 'not-found') {
-          const { setDoc } = await import('firebase/firestore');
-          await setDoc(userRef, { savedCourses: [course?.id], progress: { [course?.id as string]: 1 }, wishlist: [] });
-        } else {
-          throw e;
-        }
-      });
+      await enrollInCourse(user.uid, course.id, course.title);
       setIsEnrolled(true);
-      setCompletedModules(1);
-      toast.success("Successfully enrolled!", { id: "enroll" });
+      toast.success('Successfully enrolled!', { id: 'enroll' });
     } catch (err) {
-      console.error("Error saving course", err);
-      toast.error("Failed to enroll.", { id: "enroll" });
+      console.error('Error enrolling', err);
+      toast.error('Failed to enroll.', { id: 'enroll' });
     }
   };
 
@@ -139,7 +150,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
         }).catch(async (e) => {
           if (e.code === 'not-found') {
             const { setDoc } = await import('firebase/firestore');
-            await setDoc(userRef, { wishlist: [course.id], savedCourses: [], progress: {} });
+            await setDoc(userRef, { wishlist: [course.id], enrolledCourses: [], savedCourses: [] });
           } else {
             throw e;
           }
@@ -153,17 +164,33 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     }
   };
 
-  const handleContinue = async () => {
+  const handleMarkDone = async (moduleId: string, moduleName: string) => {
     if (!user || !course) return;
-    const nextMod = Math.min((completedModules || 0) + 1, course.totalModules || 12);
-    setCompletedModules(nextMod);
+    setMarkingDone(moduleId);
+    setCompletedModuleIds((prev) => [...prev, moduleId]);
+    setCompletedModules((prev) => prev + 1);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        [`progress.${course.id}`]: nextMod
-      });
-      toast.success("Progress saved!");
-    } catch(err) {
-      toast.error("Failed to save progress");
+      const totalMods = moduleList.length || course.totalModules || 8;
+      const { certificateEarned } = await markModuleComplete(
+        user.uid,
+        course.id,
+        moduleId,
+        moduleName,
+        course.title,
+        totalMods,
+      );
+      if (certificateEarned) {
+        toast.success('🏆 Course complete — certificate earned!');
+      } else {
+        toast.success('Module complete!');
+      }
+    } catch (err) {
+      setCompletedModuleIds((prev) => prev.filter((id) => id !== moduleId));
+      setCompletedModules((prev) => prev - 1);
+      console.error('Failed to mark module done', err);
+      toast.error('Failed to save progress');
+    } finally {
+      setMarkingDone(null);
     }
   };
 
@@ -237,7 +264,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     doc.save(`Certificate_${course.title.replace(/\s+/g, '_')}.pdf`);
   };
 
-  const totalMod = course?.totalModules || 12;
+  const totalMod = moduleList.length || course?.totalModules || 8;
   const progressPercent = Math.round((completedModules / totalMod) * 100);
 
   const sortedReviews = useMemo(() => {
@@ -344,31 +371,69 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                   {course.description}
                 </p>
 
+                {isEnrolled && moduleList.length > 0 && (
+                  <div className="mt-8 mb-4">
+                    <h3 className="text-xs uppercase tracking-[3px] text-muted-foreground mb-4">
+                      Modules
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {moduleList.map((mod) => {
+                        const done = completedModuleIds.includes(mod.id);
+                        const loading = markingDone === mod.id;
+                        return (
+                          <div
+                            key={mod.id}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                              done
+                                ? 'border-white/5 bg-white/[0.02]'
+                                : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            <div
+                              className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
+                                done ? 'bg-white/10 border-white/20' : 'border-white/20'
+                              }`}
+                            >
+                              {done && <CheckCircle2 size={12} className="text-white/60" />}
+                            </div>
+                            <span
+                              className={`flex-1 text-sm ${
+                                done ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {mod.title}
+                            </span>
+                            {!done && (
+                              <button
+                                onClick={() => handleMarkDone(mod.id, mod.title)}
+                                disabled={loading}
+                                className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
+                              >
+                                {loading ? '...' : 'Mark done'}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-background/95 backdrop-blur-sm border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 mt-4 z-10">
                   {!isEnrolled ? (
-                    <>
-                      <button 
-                        onClick={handleSaveCourse}
-                        className="w-full sm:w-auto px-8 py-3 bg-foreground text-background font-semibold rounded-full hover:scale-[1.02] transition-transform"
-                      >
-                        Enroll for ${course.price}
-                      </button>
-                    </>
+                    <button
+                      onClick={handleSaveCourse}
+                      className="w-full sm:w-auto px-8 py-3 bg-foreground text-background font-semibold rounded-full hover:scale-[1.02] transition-transform"
+                    >
+                      Enroll for ${course.price}
+                    </button>
                   ) : (
                     <>
-                      <button 
-                        onClick={handleContinue}
-                        disabled={progressPercent === 100}
-                        className="w-full sm:w-auto px-8 py-3 bg-foreground text-background font-semibold rounded-full hover:scale-[1.02] transition-transform flex items-center gap-2 justify-center disabled:opacity-50"
-                      >
-                        <PlayCircle size={18} />
-                        {progressPercent === 100 ? 'Completed' : 'Continue Learning'}
-                      </button>
                       <span className="text-sm font-medium text-green-400 flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-4 py-2 rounded-full">
                         <CheckCircle2 size={16} /> Enrolled
                       </span>
                       {progressPercent === 100 && (
-                        <button 
+                        <button
                           onClick={handleDownloadCertificate}
                           className="w-full sm:w-auto px-6 py-3 border border-white/10 font-semibold rounded-full hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
                         >
