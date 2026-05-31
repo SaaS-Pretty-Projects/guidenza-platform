@@ -721,6 +721,33 @@ export function InstructorDashboard() {
         </div>
       )}
 
+      {/* Earnings & Revenue Share */}
+      <div className="mb-12 liquid-glass p-6 rounded-3xl border border-white/5">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Earnings & Payouts</h2>
+            <p className="text-sm text-muted-foreground mt-1">70/30 revenue share &bull; You keep 70% of every enrollment</p>
+          </div>
+          <button className="px-5 py-2.5 rounded-full bg-green-500/10 text-green-400 font-medium text-sm hover:bg-green-500/20 transition">
+            Request Withdrawal
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-white/3 border border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Total Earned (70%)</p>
+            <p className="text-2xl font-semibold text-green-400">${Math.round(totalRevenue * 0.7).toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-white/3 border border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Available for Withdrawal</p>
+            <p className="text-2xl font-semibold">${Math.round(totalRevenue * 0.7 * 0.8).toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-white/3 border border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Pending (Processing)</p>
+            <p className="text-2xl font-semibold text-yellow-400">${Math.round(totalRevenue * 0.7 * 0.2).toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Edit/Create Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

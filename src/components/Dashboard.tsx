@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -70,6 +71,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen pt-32 pb-20 px-6 max-w-7xl mx-auto">
+      <Helmet><title>Dashboard | Guidenza</title></Helmet>
       <h1 className="text-4xl font-semibold mb-8 tracking-[-0.5px]">Your Dashboard</h1>
       <p className="text-muted-foreground mb-12 text-lg max-w-2xl">
         Access your saved courses and pick up where you left off.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { db } from '../lib/firebase';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { CoursePreview } from './CoursePreview';
@@ -62,6 +63,10 @@ export function Explore() {
 
   return (
     <div className="min-h-screen pt-32 pb-20 px-6 max-w-7xl mx-auto">
+      <Helmet>
+        <title>Explore Courses | Guidenza</title>
+        <meta name="description" content="Browse expert-led courses in development, business, data science, and more. Learn at your own pace with AI-powered tutoring." />
+      </Helmet>
       <h1 className="text-4xl font-semibold mb-8 tracking-[-0.5px]">Explore Courses</h1>
       
       {/* Category Filters */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
-import { Instagram, Linkedin, Twitter, Menu, UserCircle, LogOut } from 'lucide-react';
+import { Instagram, Linkedin, Twitter, Menu, UserCircle, LogOut, Zap, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SearchBar } from './SearchBar';
 import { useAuth } from '../contexts/AuthContext';
@@ -82,6 +82,11 @@ export function Navbar() {
               <span className="absolute left-0 -bottom-1 h-[1px] w-0 bg-foreground transition-all duration-300 group-hover:w-full" />
             </Link>
           )}
+          <Link to="/credits" className="group relative text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <Zap className="w-3.5 h-3.5" />
+            Credits
+            <span className="absolute left-0 -bottom-1 h-[1px] w-0 bg-foreground transition-all duration-300 group-hover:w-full" />
+          </Link>
         </div>
 
         {/* Right: Desktop Socials, Auth & Mobile Menu Toggle */}
@@ -114,6 +119,18 @@ export function Navbar() {
                       className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-white/5"
                     >
                       Instructor Dashboard
+                    </Link>
+                    <Link 
+                      to="/credits"
+                      className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-white/5 flex items-center gap-2"
+                    >
+                      <Zap size={14} /> Credits
+                    </Link>
+                    <Link 
+                      to="/referrals"
+                      className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-white/5 flex items-center gap-2"
+                    >
+                      <Gift size={14} /> Referrals
                     </Link>
                     <button 
                       onClick={logout}
@@ -179,6 +196,18 @@ export function Navbar() {
               <motion.div variants={itemVariants}>
                 <Link to="/instructor-dashboard" className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors block" onClick={() => setMobileMenuOpen(false)}>
                   Instructor Dashboard
+                </Link>
+              </motion.div>
+            )}
+            <motion.div variants={itemVariants}>
+              <Link to="/credits" className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors block" onClick={() => setMobileMenuOpen(false)}>
+                Credits
+              </Link>
+            </motion.div>
+            {user && (
+              <motion.div variants={itemVariants}>
+                <Link to="/referrals" className="text-lg font-medium text-muted-foreground hover:text-foreground transition-colors block" onClick={() => setMobileMenuOpen(false)}>
+                  Referrals
                 </Link>
               </motion.div>
             )}

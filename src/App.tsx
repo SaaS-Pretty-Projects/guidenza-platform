@@ -13,9 +13,14 @@ import { Dashboard } from './components/Dashboard';
 import { Explore } from './components/Explore';
 import { InstructorProfile } from './components/InstructorProfile';
 import { InstructorDashboard } from './components/InstructorDashboard';
+import { CreditsPage } from './components/CreditsPage';
+import { AIStudyPlan } from './components/AIStudyPlan';
+import { AdminDashboard } from './components/AdminDashboard';
+import { ReferralPage } from './components/ReferralPage';
 import { Toaster } from 'react-hot-toast';
-import { HelmetProvider } from 'react-helmet-async';
+import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
+import { CreditsProvider } from './contexts/CreditsContext';
 import { ScrollProgress } from './components/ScrollProgress';
 import { FilmGrain } from './components/FilmGrain';
 import { SectionDivider } from './components/SectionDivider';
@@ -32,6 +37,13 @@ function SectionWrapper({ children }: { children: React.ReactNode }) {
 function Landing() {
   return (
     <main>
+      <Helmet>
+        <title>Guidenza – Expert-led Courses & AI Tutoring</title>
+        <meta name="description" content="Learn from industry experts with AI-powered tutoring, personalized study plans, and auto-generated quizzes. Join thousands of learners on Guidenza." />
+        <meta property="og:title" content="Guidenza – Expert-led Courses & AI Tutoring" />
+        <meta property="og:description" content="Learn from industry experts with AI-powered tutoring, personalized study plans, and auto-generated quizzes." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       <Hero />
       <SectionDivider />
       <SectionWrapper>
@@ -68,6 +80,10 @@ function AnimatedRoutes() {
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/explore" element={<Explore />} />
+          <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/study-plan" element={<AIStudyPlan />} />
+          <Route path="/referrals" element={<ReferralPage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/instructor/:authorName" element={<InstructorProfile />} />
           <Route path="/instructor-dashboard" element={<InstructorDashboard />} />
         </Routes>
@@ -104,9 +120,11 @@ export default function App() {
   return (
     <HelmetProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <AppShell />
-        </BrowserRouter>
+        <CreditsProvider>
+          <BrowserRouter>
+            <AppShell />
+          </BrowserRouter>
+        </CreditsProvider>
       </AuthProvider>
     </HelmetProvider>
   );

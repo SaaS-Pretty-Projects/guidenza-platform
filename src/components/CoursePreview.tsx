@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PlayCircle, BookOpen, Clock, CheckCircle2, Heart, Star, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCredits } from '../contexts/CreditsContext';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -36,6 +37,7 @@ interface CoursePreviewProps {
 
 export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const { user } = useAuth();
+  const { spend, tier } = useCredits();
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [completedModules, setCompletedModules] = useState(0);
@@ -96,6 +98,15 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     if (!user) {
       toast.error("Please sign in to enroll!");
       return;
+    }
+    const price = course?.price || 0;
+    if (price > 0 && tier === 'free') {
+      const creditCost = price * 100;
+      const success = await spend(creditCost, `Enrolled in: ${course?.title}`);
+      if (!success) {
+        toast.error(`Need ${creditCost} credits to enroll. Visit Credits page to top up.`);
+        return;
+      }
     }
     toast.loading("Enrolling...", { id: "enroll" });
     try {
@@ -262,6 +273,12 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
           <Helmet>
             <title>{course.title} | Guidenza</title>
             <meta name="description" content={course.description} />
+            <meta property="og:title" content={`${course.title} | Guidenza`} />
+            <meta property="og:description" content={course.description} />
+            <meta property="og:type" content="product" />
+            {course.thumbnail && <meta property="og:image" content={course.thumbnail} />}
+            {course.price > 0 && <meta property="product:price:amount" content={String(course.price)} />}
+            <meta property="product:price:currency" content="USD" />
           </Helmet>
           <motion.div
             initial={{ opacity: 0 }}
