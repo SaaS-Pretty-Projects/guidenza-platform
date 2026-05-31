@@ -13,7 +13,7 @@ const STUDY_PLAN_COST = 100;
 
 export function AIStudyPlan() {
   const { user } = useAuth();
-  const { credits, spend, canAfford, tier } = useCredits();
+  const { credits, spend, addCredits, canAfford, tier } = useCredits();
   const rateLimiter = useRateLimit({ key: 'ai_study_plan', maxPerDay: 3 });
   const [goal, setGoal] = useState('');
   const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
@@ -32,18 +32,21 @@ export function AIStudyPlan() {
       return;
     }
 
-    if (!rateLimiter.consume()) {
+    if (!rateLimiter.isAllowed()) {
       toast.error('Daily study plan limit reached (3/day). Try again tomorrow.');
       return;
     }
 
+    let creditsDeducted = false;
     if (tier === 'free') {
       const success = await spend(STUDY_PLAN_COST, 'AI Study Plan generation');
       if (!success) {
         toast.error(`Need ${STUDY_PLAN_COST} credits. You have ${credits}.`);
         return;
       }
+      creditsDeducted = true;
     }
+    rateLimiter.consume();
 
     setLoading(true);
     try {
@@ -70,6 +73,9 @@ Format as clean markdown. Be specific and practical.`;
       setPlan(response.text || 'Failed to generate plan. Please try again.');
     } catch (err) {
       console.error('Study plan generation error:', err);
+      if (creditsDeducted) {
+        await addCredits(STUDY_PLAN_COST, 'Refund: study plan generation failed', 'refund');
+      }
       toast.error('Failed to generate study plan');
     } finally {
       setLoading(false);

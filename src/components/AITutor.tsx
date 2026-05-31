@@ -23,7 +23,7 @@ interface AITutorProps {
 
 export function AITutor({ courseTitle, courseDescription, isOpen, onClose }: AITutorProps) {
   const { user } = useAuth();
-  const { credits, spend, canAfford, tier } = useCredits();
+  const { credits, spend, addCredits, canAfford, tier } = useCredits();
   const rateLimiter = useRateLimit({ key: 'ai_tutor', maxPerDay: 10 });
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -40,7 +40,7 @@ export function AITutor({ courseTitle, courseDescription, isOpen, onClose }: AIT
       toast.error(`Not enough credits. Need ${AI_TUTOR_COST} credits.`);
       return;
     }
-    if (!rateLimiter.consume()) {
+    if (!rateLimiter.isAllowed()) {
       toast.error('Daily tutor session limit reached (10/day). Try again tomorrow.');
       return;
     }
@@ -51,6 +51,7 @@ export function AITutor({ courseTitle, courseDescription, isOpen, onClose }: AIT
         return;
       }
     }
+    rateLimiter.consume();
     setSessionStarted(true);
     setMessages([{
       role: 'assistant',
