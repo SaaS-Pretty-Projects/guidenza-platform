@@ -37,7 +37,7 @@ interface CoursePreviewProps {
 
 export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const { user } = useAuth();
-  const { spend, tier } = useCredits();
+  const { spend, tier, addCredits } = useCredits();
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [completedModules, setCompletedModules] = useState(0);
@@ -100,13 +100,15 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       return;
     }
     const price = course?.price || 0;
+    const creditCost = price * 100;
+    let creditsDeducted = false;
     if (price > 0 && tier === 'free') {
-      const creditCost = price * 100;
       const success = await spend(creditCost, `Enrolled in: ${course?.title}`);
       if (!success) {
         toast.error(`Need ${creditCost} credits to enroll. Visit Credits page to top up.`);
         return;
       }
+      creditsDeducted = true;
     }
     toast.loading("Enrolling...", { id: "enroll" });
     try {
@@ -127,6 +129,9 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       toast.success("Successfully enrolled!", { id: "enroll" });
     } catch (err) {
       console.error("Error saving course", err);
+      if (creditsDeducted) {
+        await addCredits(creditCost, `Refund: enrollment failed for ${course?.title}`, 'refund');
+      }
       toast.error("Failed to enroll.", { id: "enroll" });
     }
   };
