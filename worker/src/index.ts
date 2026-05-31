@@ -14,6 +14,7 @@ export interface Env {
   SMTP_PASS: string;
   RATE_LIMIT: KVNamespace;
   INTERNAL_API_SECRET: string;
+  FIREBASE_API_KEY: string;
 }
 
 interface CreditPack {
@@ -171,8 +172,26 @@ async function handleEmail(request: Request, env: Env): Promise<Response> {
 async function handleRedeemCoupon(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  const { code, uid } = await request.json() as { code: string; uid: string };
-  if (!code || !uid) return json({ error: 'Missing code or uid' }, 400);
+  const { code } = await request.json() as { code: string };
+  if (!code) return json({ error: 'Missing code' }, 400);
+
+  // Verify Firebase ID token from Authorization header
+  const authHeader = request.headers.get('Authorization') || '';
+  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!idToken) return json({ error: 'Unauthorized' }, 401);
+
+  const verifyRes = await fetch(
+    `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${env.FIREBASE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    }
+  );
+  if (!verifyRes.ok) return json({ error: 'Invalid token' }, 401);
+  const verifyData = await verifyRes.json() as { users?: Array<{ localId: string }> };
+  const uid = verifyData.users?.[0]?.localId;
+  if (!uid) return json({ error: 'Invalid token' }, 401);
 
   const token = await getFirebaseToken(env);
   const projectId = env.FIREBASE_PROJECT_ID;

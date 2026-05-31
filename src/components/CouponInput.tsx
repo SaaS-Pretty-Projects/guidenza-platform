@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../lib/firebase';
 import { Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -14,10 +15,15 @@ export function CouponInput() {
     if (!user || !code.trim()) return;
     setLoading(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        toast.error('Please sign in again');
+        return;
+      }
       const res = await fetch(`${API_BASE}/api/redeem-coupon`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.toUpperCase(), uid: user.uid }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ code: code.toUpperCase() }),
       });
 
       const data = await res.json();
