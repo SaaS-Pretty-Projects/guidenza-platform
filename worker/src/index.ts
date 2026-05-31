@@ -13,6 +13,7 @@ export interface Env {
   SMTP_USER: string;
   SMTP_PASS: string;
   RATE_LIMIT: KVNamespace;
+  INTERNAL_API_SECRET: string;
 }
 
 interface CreditPack {
@@ -67,6 +68,8 @@ export default {
           return handleIPN(request, env);
         case '/api/send-email':
           return handleEmail(request, env);
+        case '/api/redeem-coupon':
+          return handleRedeemCoupon(request, env);
         case '/api/health':
           return json({ status: 'ok', timestamp: Date.now() });
         default:
@@ -155,9 +158,92 @@ async function handleIPN(request: Request, env: Env): Promise<Response> {
 async function handleEmail(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
+  const authHeader = request.headers.get('Authorization') || '';
+  if (authHeader !== `Bearer ${env.INTERNAL_API_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
   const { to, subject, body } = await request.json() as { to: string; subject: string; body: string };
   await sendTransactionalEmail(env, to, { subject, body });
   return json({ sent: true });
+}
+
+async function handleRedeemCoupon(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  const { code, uid } = await request.json() as { code: string; uid: string };
+  if (!code || !uid) return json({ error: 'Missing code or uid' }, 400);
+
+  const token = await getFirebaseToken(env);
+  const projectId = env.FIREBASE_PROJECT_ID;
+  const couponPath = `projects/${projectId}/databases/(default)/documents/coupons/${code.toUpperCase()}`;
+
+  // Read coupon
+  const couponRes = await fetch(
+    `https://firestore.googleapis.com/v1/${couponPath}`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  if (!couponRes.ok) return json({ error: 'Invalid coupon code' }, 404);
+
+  const couponDoc = await couponRes.json() as Record<string, any>;
+  const fields = couponDoc.fields || {};
+
+  const usedByArr: string[] = (fields.usedBy?.arrayValue?.values || []).map((v: any) => v.stringValue);
+  if (usedByArr.includes(uid)) return json({ error: 'You have already used this coupon' }, 400);
+
+  const usedCount = parseInt(fields.usedCount?.integerValue || '0', 10);
+  const maxUses = fields.maxUses ? parseInt(fields.maxUses.integerValue || '0', 10) : 0;
+  if (maxUses && usedCount >= maxUses) return json({ error: 'Coupon has reached its usage limit' }, 400);
+
+  const expiresAt = fields.expiresAt?.stringValue;
+  if (expiresAt && new Date(expiresAt) < new Date()) return json({ error: 'Coupon has expired' }, 400);
+
+  const credits = parseInt(fields.credits?.integerValue || '0', 10);
+  if (credits <= 0) return json({ error: 'Invalid coupon' }, 400);
+
+  // Atomic commit: mark coupon as used + increment user credits
+  const userPath = `projects/${projectId}/databases/(default)/documents/users/${uid}`;
+  const updatedUsedBy = [...usedByArr, uid].map(v => ({ stringValue: v }));
+
+  const commitRes = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        writes: [
+          {
+            update: {
+              name: couponPath,
+              fields: {
+                ...fields,
+                usedBy: { arrayValue: { values: updatedUsedBy } },
+                usedCount: { integerValue: String(usedCount + 1) }
+              }
+            },
+            currentDocument: { updateTime: couponDoc.updateTime }
+          },
+          {
+            transform: {
+              document: userPath,
+              fieldTransforms: [{
+                fieldPath: 'credits',
+                increment: { integerValue: credits.toString() }
+              }]
+            }
+          }
+        ]
+      })
+    }
+  );
+
+  if (!commitRes.ok) {
+    const err = await commitRes.text();
+    console.error('Coupon commit failed:', err);
+    return json({ error: 'Coupon redemption failed, please try again' }, 409);
+  }
+
+  return json({ success: true, credits });
 }
 
 // --- Helpers ---
@@ -208,13 +294,22 @@ function hexToBytes(hex: string): Uint8Array {
 
 async function updateFirebaseCredits(env: Env, uid: string, credits: number): Promise<void> {
   const token = await getFirebaseToken(env);
+  const docPath = `projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
   await fetch(
-    `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=credits`,
+    `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`,
     {
-      method: 'PATCH',
+      method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fields: { credits: { integerValue: credits.toString() } }
+        writes: [{
+          transform: {
+            document: docPath,
+            fieldTransforms: [{
+              fieldPath: 'credits',
+              increment: { integerValue: credits.toString() }
+            }]
+          }
+        }]
       })
     }
   );
