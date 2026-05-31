@@ -4,6 +4,7 @@ import { fadeUp } from '../lib/animations';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useMagnetic } from '../hooks/useMagnetic';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const AVATARS = [
   "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop",
@@ -46,6 +47,7 @@ export function Hero() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const magnetic = useMagnetic(0.2);
+  const reducedMotion = useReducedMotion();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,18 +85,18 @@ export function Hero() {
 
       {/* Parallax depth orbs */}
       <motion.div
-        animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        animate={reducedMotion ? undefined : { y: [0, -20, 0], x: [0, 10, 0] }}
+        transition={reducedMotion ? undefined : { duration: 8, repeat: Infinity, ease: "easeInOut" }}
         className="absolute top-[20%] left-[15%] w-64 h-64 rounded-full bg-accent/5 blur-[80px] z-[1]"
       />
       <motion.div
-        animate={{ y: [0, 15, 0], x: [0, -15, 0] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        animate={reducedMotion ? undefined : { y: [0, 15, 0], x: [0, -15, 0] }}
+        transition={reducedMotion ? undefined : { duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
         className="absolute bottom-[30%] right-[10%] w-80 h-80 rounded-full bg-purple-500/5 blur-[100px] z-[1]"
       />
       <motion.div
-        animate={{ y: [0, -10, 0], x: [0, 8, 0] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+        animate={reducedMotion ? undefined : { y: [0, -10, 0], x: [0, 8, 0] }}
+        transition={reducedMotion ? undefined : { duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
         className="absolute top-[50%] right-[30%] w-48 h-48 rounded-full bg-blue-500/5 blur-[60px] z-[1]"
       />
 
