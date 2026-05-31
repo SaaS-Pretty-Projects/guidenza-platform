@@ -94,8 +94,8 @@ export function AdminDashboard() {
     }
     try {
       const userRef = doc(db, 'users', creditAdjust.userId);
-      const currentUser = users.find(u => u.id === creditAdjust.userId);
-      await updateDoc(userRef, { credits: (currentUser?.credits || 0) + amount });
+      const { increment } = await import('firebase/firestore');
+      await updateDoc(userRef, { credits: increment(amount) });
       setUsers(users.map(u => u.id === creditAdjust.userId ? { ...u, credits: (u.credits || 0) + amount } : u));
       toast.success(`Adjusted ${amount} credits`);
       setCreditAdjust(null);
