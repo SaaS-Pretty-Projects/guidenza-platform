@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { fadeUp } from '../lib/animations';
+import { fadeUp, textReveal } from '../lib/animations';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -53,7 +53,7 @@ export function Hero() {
       <div className="absolute bottom-0 w-full h-64 bg-gradient-to-t from-background to-transparent z-[1]" />
 
       {/* Content */}
-      <div className="relative z-10 pt-28 md:pt-32 px-6 flex flex-col items-center text-center w-full">
+      <div className="relative z-10 pt-24 sm:pt-28 md:pt-32 px-4 sm:px-6 flex flex-col items-center text-center w-full">
         {/* Social Proof */}
         <motion.div
           {...fadeUp(0)}
@@ -77,8 +77,8 @@ export function Hero() {
 
         {/* H1 */}
         <motion.h1
-          {...fadeUp(0.1)}
-          className="text-5xl md:text-7xl lg:text-8xl font-medium tracking-[-2px] max-w-5xl leading-[1.02] text-foreground"
+          {...textReveal(0.1)}
+          className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-medium tracking-[-1.5px] md:tracking-[-2px] max-w-5xl leading-[1.05] md:leading-[1.02] text-foreground"
         >
           Get <span className="font-serif italic font-normal text-foreground">Expert</span> Knowledge
         </motion.h1>
@@ -86,7 +86,7 @@ export function Hero() {
         {/* Subhead */}
         <motion.p
           {...fadeUp(0.25)}
-          className="text-lg max-w-2xl mt-8 mx-auto text-[color:var(--color-hero-subtitle)]"
+          className="text-base sm:text-lg max-w-2xl mt-6 sm:mt-8 mx-auto text-[color:var(--color-hero-subtitle)]"
         >
           Guidenza – expert-led courses and trusted knowledge from real specialists. Discover varied approaches and topics in one seamless ecosystem.
         </motion.p>
@@ -95,7 +95,7 @@ export function Hero() {
         <motion.form
           {...fadeUp(0.4)}
           onSubmit={handleSubmit}
-          className="liquid-glass rounded-full p-2 max-w-lg w-full mt-10 md:mt-12 flex items-center gap-2 mx-auto"
+          className="liquid-glass rounded-full p-1.5 sm:p-2 max-w-lg w-full mt-8 sm:mt-10 md:mt-12 flex items-center gap-1.5 sm:gap-2 mx-auto"
         >
           <input
             type="email"
@@ -103,7 +103,7 @@ export function Hero() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={status === 'loading'}
             placeholder={status === 'success' ? "Thanks for subscribing!" : "Enter your email to join"}
-            className="flex-1 bg-transparent border-none text-foreground px-4 py-2 outline-none placeholder:text-muted-foreground disabled:opacity-50"
+            className="flex-1 min-w-0 bg-transparent border-none text-foreground px-3 sm:px-4 py-2 outline-none placeholder:text-muted-foreground disabled:opacity-50 text-sm sm:text-base"
             required
           />
           <motion.button
@@ -111,7 +111,7 @@ export function Hero() {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={status === 'loading' || status === 'success'}
-            className="bg-foreground text-background shrink-0 rounded-full px-8 py-3 text-xs font-semibold tracking-[2px] uppercase disabled:opacity-50 transition-opacity"
+            className="bg-foreground text-background shrink-0 rounded-full px-5 sm:px-8 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold tracking-[1.5px] sm:tracking-[2px] uppercase disabled:opacity-50 transition-opacity"
           >
             {status === 'loading' ? 'JOINING...' : status === 'success' ? 'JOINED!' : 'GET STARTED'}
           </motion.button>

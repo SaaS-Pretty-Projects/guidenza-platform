@@ -57,15 +57,15 @@ export function Solution() {
   }, [user]);
 
   return (
-    <section className="py-32 md:pt-44 border-t border-border/30 px-6 md:px-8">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-12">
+    <section className="py-20 sm:py-32 md:pt-44 border-t border-border/30 px-4 sm:px-6 md:px-8">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 sm:gap-16 lg:gap-12">
         {/* Left Column - Sticky */}
         <div className="lg:col-span-5">
           <motion.div {...fadeUp(0)} className="lg:sticky lg:top-32">
             <div className="text-xs uppercase tracking-[3px] text-muted-foreground mb-6">
               Value Proposition
             </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-[-1px] mb-6">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-medium tracking-[-0.5px] sm:tracking-[-1px] mb-6">
               A platform for <span className="font-serif italic font-normal">expert</span> learning
             </h2>
             <p className="text-lg text-muted-foreground mb-10">
@@ -102,8 +102,8 @@ export function Solution() {
                     Enrolled
                   </div>
                 )}
-                <div className="flex flex-col md:flex-row gap-6 items-start">
-                  <div className="w-full md:w-32 h-32 shrink-0 rounded-2xl overflow-hidden bg-muted">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+                  <div className="w-full sm:w-28 md:w-32 h-28 sm:h-32 shrink-0 rounded-xl sm:rounded-2xl overflow-hidden bg-muted">
                     <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   </div>
                   <div className="flex-1">

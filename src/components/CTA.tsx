@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { fadeUp, cinematicSection } from '../lib/animations';
+import { fadeUp, textReveal, cinematicSection } from '../lib/animations';
 import { Logo } from './Logo';
 
 export function CTA() {
   return (
-    <motion.section {...cinematicSection} className="relative py-32 md:py-44 border-t border-border/30 overflow-hidden px-6 md:px-8 flex justify-center">
+    <motion.section {...cinematicSection} className="relative py-20 sm:py-32 md:py-44 border-t border-border/30 overflow-hidden px-4 sm:px-6 md:px-8 flex justify-center">
       {/* Background Video */}
       <video
         autoPlay
@@ -26,15 +26,15 @@ export function CTA() {
         </motion.div>
 
         <motion.h2 
-          {...fadeUp(0.1)}
-          className="text-4xl md:text-6xl lg:text-7xl font-medium tracking-[-1px] mt-8 leading-[1.05]"
+          {...textReveal(0.1)}
+          className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-medium tracking-[-0.5px] sm:tracking-[-1px] mt-6 sm:mt-8 leading-[1.08] md:leading-[1.05]"
         >
           <span className="font-serif italic font-normal">Share</span> Your Expertise
         </motion.h2>
 
         <motion.p
           {...fadeUp(0.2)}
-          className="text-lg md:text-xl text-muted-foreground mt-6 max-w-xl mx-auto"
+          className="text-base sm:text-lg md:text-xl text-muted-foreground mt-4 sm:mt-6 max-w-xl mx-auto"
         >
           Join our marketplace today. As a learner, expand your skills. As an expert, monetize your knowledge.
         </motion.p>
