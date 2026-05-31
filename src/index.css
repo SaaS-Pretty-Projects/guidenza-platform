@@ -151,6 +151,12 @@ html.lenis, html.lenis body {
   background-size: 200% 100%;
 }
 
+/* Magnetic button translate via CSS custom props — composes with framer-motion scale */
+.magnetic-target {
+  translate: var(--magnetic-x, 0px) var(--magnetic-y, 0px);
+  transition: translate 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Reduced motion overrides */
 @media (prefers-reduced-motion: reduce) {
   .liquid-glass::before { animation: none; }

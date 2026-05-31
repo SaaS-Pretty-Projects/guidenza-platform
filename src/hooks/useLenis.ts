@@ -20,14 +20,17 @@ export function useLenis() {
       touchMultiplier: 1.5,
     });
 
+    let frameId: number;
+
     function raf(time: number) {
       lenisInstance?.raf(time);
-      requestAnimationFrame(raf);
+      frameId = requestAnimationFrame(raf);
     }
 
-    requestAnimationFrame(raf);
+    frameId = requestAnimationFrame(raf);
 
     return () => {
+      cancelAnimationFrame(frameId);
       lenisInstance?.destroy();
       lenisInstance = null;
     };

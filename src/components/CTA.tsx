@@ -14,7 +14,8 @@ function MagneticButton({ children, className }: { children: React.ReactNode; cl
       onMouseLeave={onMouseLeave}
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.98 }}
-      className={className}
+      className={`${className} magnetic-target`}
+      style={{ '--magnetic-x': '0px', '--magnetic-y': '0px' } as React.CSSProperties}
     >
       {children}
     </motion.button>
