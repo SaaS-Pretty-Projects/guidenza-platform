@@ -30,7 +30,7 @@ service cloud.firestore {
       match /reviews/{reviewId} {
         allow read: if true;
         allow create: if isSignedIn();
-        allow update, delete: if isOwner(reviewId) || isAdmin();
+        allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
       }
       match /announcements/{announcementId} {
         allow read: if true;
@@ -43,7 +43,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if (isOwner(userId) || isAdmin())
+        && request.resource.data.credits >= 0;
       allow delete: if false;
 
       // transactions are append-only by the owner
