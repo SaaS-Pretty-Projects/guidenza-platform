@@ -247,13 +247,13 @@ export function CreditsPage() {
               {transactions.map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between px-5 py-3.5">
                   <div className="flex items-center gap-3">
-                    {tx.amount > 0 ? (
-                      <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                        <ArrowDownRight className="w-4 h-4 text-green-400" />
-                      </div>
-                    ) : tx.type === 'referral' ? (
+                    {tx.type === 'referral' ? (
                       <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center">
                         <Gift className="w-4 h-4 text-purple-400" />
+                      </div>
+                    ) : tx.amount > 0 ? (
+                      <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                        <ArrowDownRight className="w-4 h-4 text-green-400" />
                       </div>
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center">
