@@ -119,7 +119,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       }).catch(async (e) => {
         if (e.code === 'not-found') {
           const { setDoc } = await import('firebase/firestore');
-          await setDoc(userRef, { savedCourses: [course?.id], progress: { [course?.id as string]: 1 }, wishlist: [] });
+          await setDoc(userRef, { savedCourses: [course?.id], progress: { [course?.id as string]: 1 }, wishlist: [], credits: 0 });
         } else {
           throw e;
         }
@@ -155,7 +155,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
         }).catch(async (e) => {
           if (e.code === 'not-found') {
             const { setDoc } = await import('firebase/firestore');
-            await setDoc(userRef, { wishlist: [course.id], savedCourses: [], progress: {} });
+            await setDoc(userRef, { wishlist: [course.id], savedCourses: [], progress: {}, credits: 0 });
           } else {
             throw e;
           }
