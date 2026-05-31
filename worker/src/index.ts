@@ -62,9 +62,11 @@ export default {
 
       switch (path) {
         case '/api/checkout':
-          return handleCheckout(request, env, url);
+          return handleCheckout(request, env);
         case '/api/subscribe':
-          return handleSubscribe(request, env, url);
+          return handleSubscribe(request, env);
+        case '/api/refund':
+          return handleRefund(request, env);
         case '/api/webhook/safepay':
           return handleIPN(request, env);
         case '/api/send-email':
@@ -83,16 +85,36 @@ export default {
   },
 };
 
-async function handleCheckout(request: Request, env: Env, url: URL): Promise<Response> {
-  const packId = url.searchParams.get('pack');
-  const uid = url.searchParams.get('uid');
+async function verifyIdToken(request: Request, env: Env): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization') || '';
+  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!idToken) return null;
 
-  if (!packId || !uid) return json({ error: 'Missing pack or uid' }, 400);
+  const verifyRes = await fetch(
+    `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${env.FIREBASE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    }
+  );
+  if (!verifyRes.ok) return null;
+  const verifyData = await verifyRes.json() as { users?: Array<{ localId: string }> };
+  return verifyData.users?.[0]?.localId || null;
+}
+
+async function handleCheckout(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  const uid = await verifyIdToken(request, env);
+  if (!uid) return json({ error: 'Unauthorized' }, 401);
+
+  const { packId } = await request.json() as { packId: string };
+  if (!packId) return json({ error: 'Missing packId' }, 400);
 
   const pack = CREDIT_PACKS.find(p => p.id === packId);
   if (!pack) return json({ error: 'Invalid pack' }, 400);
 
-  // Create SafePay checkout session
   const session = await createSafepaySession(env, {
     amount: pack.price * 100,
     currency: 'USD',
@@ -103,11 +125,14 @@ async function handleCheckout(request: Request, env: Env, url: URL): Promise<Res
   return json({ checkoutUrl: session.url, sessionId: session.id });
 }
 
-async function handleSubscribe(request: Request, env: Env, url: URL): Promise<Response> {
-  const tier = url.searchParams.get('tier');
-  const uid = url.searchParams.get('uid');
+async function handleSubscribe(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  if (!tier || !uid) return json({ error: 'Missing tier or uid' }, 400);
+  const uid = await verifyIdToken(request, env);
+  if (!uid) return json({ error: 'Unauthorized' }, 401);
+
+  const { tier } = await request.json() as { tier: string };
+  if (!tier) return json({ error: 'Missing tier' }, 400);
 
   const price = SUBSCRIPTION_PRICES[tier];
   if (!price) return json({ error: 'Invalid tier' }, 400);
@@ -175,23 +200,8 @@ async function handleRedeemCoupon(request: Request, env: Env): Promise<Response>
   const { code } = await request.json() as { code: string };
   if (!code) return json({ error: 'Missing code' }, 400);
 
-  // Verify Firebase ID token from Authorization header
-  const authHeader = request.headers.get('Authorization') || '';
-  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (!idToken) return json({ error: 'Unauthorized' }, 401);
-
-  const verifyRes = await fetch(
-    `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${env.FIREBASE_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    }
-  );
-  if (!verifyRes.ok) return json({ error: 'Invalid token' }, 401);
-  const verifyData = await verifyRes.json() as { users?: Array<{ localId: string }> };
-  const uid = verifyData.users?.[0]?.localId;
-  if (!uid) return json({ error: 'Invalid token' }, 401);
+  const uid = await verifyIdToken(request, env);
+  if (!uid) return json({ error: 'Unauthorized' }, 401);
 
   const token = await getFirebaseToken(env);
   const projectId = env.FIREBASE_PROJECT_ID;
@@ -263,6 +273,19 @@ async function handleRedeemCoupon(request: Request, env: Env): Promise<Response>
   }
 
   return json({ success: true, credits });
+}
+
+async function handleRefund(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  const uid = await verifyIdToken(request, env);
+  if (!uid) return json({ error: 'Unauthorized' }, 401);
+
+  const { amount, description } = await request.json() as { amount: number; description: string };
+  if (!amount || amount <= 0 || !description) return json({ error: 'Invalid refund parameters' }, 400);
+
+  await updateFirebaseCredits(env, uid, amount);
+  return json({ success: true, refunded: amount });
 }
 
 // --- Helpers ---

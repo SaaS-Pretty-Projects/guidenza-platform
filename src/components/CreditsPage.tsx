@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useCredits } from '../contexts/CreditsContext';
 import { Zap, CreditCard, Clock, ArrowUpRight, ArrowDownRight, Gift, Crown } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Helmet } from 'react-helmet-async';
 import toast from 'react-hot-toast';
@@ -90,7 +90,13 @@ export function CreditsPage() {
     const pack = CREDIT_PACKS.find(p => p.id === packId);
     if (!pack) return;
     try {
-      const res = await fetch(`${API_BASE}/api/checkout?pack=${packId}&uid=${user.uid}`);
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) { toast.error('Please sign in again'); return; }
+      const res = await fetch(`${API_BASE}/api/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ packId }),
+      });
       const data = await res.json();
       if (data.checkoutUrl) {
         window.open(data.checkoutUrl, '_blank');
@@ -113,7 +119,13 @@ export function CreditsPage() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/api/subscribe?tier=${tierId}&uid=${user.uid}`);
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) { toast.error('Please sign in again'); return; }
+      const res = await fetch(`${API_BASE}/api/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ tier: tierId }),
+      });
       const data = await res.json();
       if (data.checkoutUrl) {
         window.open(data.checkoutUrl, '_blank');
