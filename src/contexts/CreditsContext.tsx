@@ -71,15 +71,19 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     }
     if (credits < amount) return false;
 
-    const userRef = doc(db, 'users', user.uid);
-    await updateDoc(userRef, { credits: increment(-amount) });
-    await addDoc(collection(db, `users/${user.uid}/transactions`), {
-      type: 'spend',
-      amount: -amount,
-      description,
-      createdAt: serverTimestamp()
-    });
-    return true;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, { credits: increment(-amount) });
+      await addDoc(collection(db, `users/${user.uid}/transactions`), {
+        type: 'spend',
+        amount: -amount,
+        description,
+        createdAt: serverTimestamp()
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }, [user, credits, tier]);
 
   const addCredits = useCallback(async (amount: number, description: string, type: Transaction['type'] = 'purchase') => {
