@@ -15,7 +15,7 @@ service cloud.firestore {
 
     // ---------- subscriptions ----------
     match /subscriptions/{subscriptionId} {
-      allow create: if isSignedIn();
+      allow create: if true;
       allow read: if isAdmin();
       allow update, delete: if false;
     }
