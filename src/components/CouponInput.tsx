@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-import { db } from '../lib/firebase';
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { useCredits } from '../contexts/CreditsContext';
 import { Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 export function CouponInput() {
   const { user } = useAuth();
-  const { addCredits } = useCredits();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,35 +14,19 @@ export function CouponInput() {
     if (!user || !code.trim()) return;
     setLoading(true);
     try {
-      const couponRef = doc(db, 'coupons', code.toUpperCase());
-      const couponSnap = await getDoc(couponRef);
-
-      if (!couponSnap.exists()) {
-        toast.error('Invalid coupon code');
-        return;
-      }
-
-      const coupon = couponSnap.data();
-      if (coupon.usedBy?.includes(user.uid)) {
-        toast.error('You have already used this coupon');
-        return;
-      }
-      if (coupon.maxUses && (coupon.usedCount || 0) >= coupon.maxUses) {
-        toast.error('This coupon has reached its usage limit');
-        return;
-      }
-      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
-        toast.error('This coupon has expired');
-        return;
-      }
-
-      await addCredits(coupon.credits, `Coupon: ${code.toUpperCase()}`);
-      await updateDoc(couponRef, {
-        usedBy: [...(coupon.usedBy || []), user.uid],
-        usedCount: increment(1)
+      const res = await fetch(`${API_BASE}/api/redeem-coupon`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.toUpperCase(), uid: user.uid }),
       });
 
-      toast.success(`Redeemed! +${coupon.credits} credits`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to redeem coupon');
+        return;
+      }
+
+      toast.success(`Redeemed! +${data.credits} credits`);
       setCode('');
     } catch (err) {
       console.error('Coupon redeem error:', err);
