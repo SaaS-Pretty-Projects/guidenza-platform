@@ -27,17 +27,17 @@ export function AIStudyPlan() {
       return;
     }
 
-    if (!rateLimiter.consume()) {
-      toast.error('Daily study plan limit reached (3/day). Try again tomorrow.');
-      return;
-    }
-
     if (tier === 'free') {
       const success = await spend(STUDY_PLAN_COST, 'AI Study Plan generation');
       if (!success) {
         toast.error(`Need ${STUDY_PLAN_COST} credits. You have ${credits}.`);
         return;
       }
+    }
+
+    if (!rateLimiter.consume()) {
+      toast.error('Daily study plan limit reached (3/day). Try again tomorrow.');
+      return;
     }
 
     setLoading(true);
