@@ -66,7 +66,8 @@ service cloud.firestore {
     match /earnings/{docId} {
       allow read: if isSignedIn()
         && (resource.data.instructorId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.instructorId == request.auth.uid;
       allow update: if isAdmin();
       allow delete: if false;
     }
