@@ -49,7 +49,7 @@ export function CoursePlayer({ courseId, courseTitle, courseDescription, totalMo
   const [expandedModule, setExpandedModule] = useState<number | null>(1);
   const [showTutor, setShowTutor] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
-  const modules = generateModules(totalModules, courseTitle);
+  const modules = React.useMemo(() => generateModules(totalModules, courseTitle), [totalModules, courseTitle]);
 
   useEffect(() => {
     if (!user) return;
