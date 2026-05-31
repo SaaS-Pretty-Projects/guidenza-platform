@@ -38,8 +38,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await signOut(auth);
-    toast.success("Successfully logged out!");
+    try {
+      await signOut(auth);
+      toast.success("Successfully logged out!");
+    } catch (error) {
+      console.error('Error signing out', error);
+      toast.error("Failed to log out.");
+    }
   };
 
   return (
