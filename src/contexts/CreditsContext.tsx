@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, updateDoc, increment, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, increment, addDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 interface Transaction {
   type: 'purchase' | 'spend' | 'refund' | 'referral' | 'subscription';
@@ -73,13 +73,16 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, { credits: increment(-amount) });
-      await addDoc(collection(db, `users/${user.uid}/transactions`), {
+      const batch = writeBatch(db);
+      batch.update(userRef, { credits: increment(-amount) });
+      const txRef = doc(collection(db, `users/${user.uid}/transactions`));
+      batch.set(txRef, {
         type: 'spend',
         amount: -amount,
         description,
         createdAt: serverTimestamp()
       });
+      await batch.commit();
       return true;
     } catch {
       return false;
