@@ -13,7 +13,7 @@ const STUDY_PLAN_COST = 100;
 
 export function AIStudyPlan() {
   const { user } = useAuth();
-  const { credits, spend, tier } = useCredits();
+  const { credits, spend, canAfford, tier } = useCredits();
   const rateLimiter = useRateLimit({ key: 'ai_study_plan', maxPerDay: 3 });
   const [goal, setGoal] = useState('');
   const [experience, setExperience] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
@@ -27,17 +27,22 @@ export function AIStudyPlan() {
       return;
     }
 
+    if (tier === 'free' && !canAfford(STUDY_PLAN_COST)) {
+      toast.error(`Need ${STUDY_PLAN_COST} credits. You have ${credits}.`);
+      return;
+    }
+
+    if (!rateLimiter.consume()) {
+      toast.error('Daily study plan limit reached (3/day). Try again tomorrow.');
+      return;
+    }
+
     if (tier === 'free') {
       const success = await spend(STUDY_PLAN_COST, 'AI Study Plan generation');
       if (!success) {
         toast.error(`Need ${STUDY_PLAN_COST} credits. You have ${credits}.`);
         return;
       }
-    }
-
-    if (!rateLimiter.consume()) {
-      toast.error('Daily study plan limit reached (3/day). Try again tomorrow.');
-      return;
     }
 
     setLoading(true);

@@ -21,7 +21,7 @@ interface AIQuizProps {
 }
 
 export function AIQuiz({ courseTitle, courseDescription }: AIQuizProps) {
-  const { credits, spend, tier } = useCredits();
+  const { credits, spend, canAfford, tier } = useCredits();
   const rateLimiter = useRateLimit({ key: 'ai_quiz', maxPerDay: 5 });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
@@ -31,16 +31,20 @@ export function AIQuiz({ courseTitle, courseDescription }: AIQuizProps) {
   const [started, setStarted] = useState(false);
 
   const generateQuiz = async () => {
+    if (tier === 'free' && !canAfford(QUIZ_COST)) {
+      toast.error(`Need ${QUIZ_COST} credits. You have ${credits}.`);
+      return;
+    }
+    if (!rateLimiter.consume()) {
+      toast.error('Daily quiz limit reached (5/day). Try again tomorrow.');
+      return;
+    }
     if (tier === 'free') {
       const success = await spend(QUIZ_COST, `AI Quiz: ${courseTitle}`);
       if (!success) {
         toast.error(`Need ${QUIZ_COST} credits. You have ${credits}.`);
         return;
       }
-    }
-    if (!rateLimiter.consume()) {
-      toast.error('Daily quiz limit reached (5/day). Try again tomorrow.');
-      return;
     }
 
     setLoading(true);
