@@ -15,7 +15,8 @@ function Word({
   children: React.ReactNode; 
   progress: MotionValue<number>; 
   range: [number, number]; 
-  isHighlight: boolean; 
+  isHighlight: boolean;
+  key?: React.Key;
 }) {
   const opacity = useTransform(progress, range, [0.2, 1]);
   const blurRaw = useTransform(progress, range, [6, 0]);

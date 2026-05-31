@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { fadeUp, textReveal } from '../lib/animations';
+import { fadeUp } from '../lib/animations';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useMagnetic } from '../hooks/useMagnetic';
 
 const AVATARS = [
   "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop",
@@ -10,9 +11,41 @@ const AVATARS = [
   "https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop"
 ];
 
+const headlineContainer = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.03, delayChildren: 0.1 }
+  }
+};
+
+const charVariant = {
+  hidden: { opacity: 0, y: 30, filter: 'blur(8px)' },
+  visible: { 
+    opacity: 1, y: 0, filter: 'blur(0px)',
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] }
+  }
+};
+
+function SplitText({ children, className }: { children: string; className?: string }) {
+  return (
+    <>
+      {children.split('').map((char, i) => (
+        <motion.span
+          key={i}
+          variants={charVariant}
+          className={`inline-block ${char === ' ' ? 'w-[0.25em]' : ''} ${className || ''}`}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </motion.span>
+      ))}
+    </>
+  );
+}
+
 export function Hero() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const magnetic = useMagnetic(0.2);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +62,6 @@ export function Hero() {
     } catch (error) {
       console.error(error);
       setStatus('error');
-      // Use the required error handler
       handleFirestoreError(error, OperationType.CREATE, 'subscriptions');
     }
   };
@@ -49,6 +81,23 @@ export function Hero() {
       {/* Soft overlay */}
       <div className="absolute inset-0 bg-background/20 z-[0]" />
 
+      {/* Parallax depth orbs */}
+      <motion.div
+        animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-[20%] left-[15%] w-64 h-64 rounded-full bg-accent/5 blur-[80px] z-[1]"
+      />
+      <motion.div
+        animate={{ y: [0, 15, 0], x: [0, -15, 0] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        className="absolute bottom-[30%] right-[10%] w-80 h-80 rounded-full bg-purple-500/5 blur-[100px] z-[1]"
+      />
+      <motion.div
+        animate={{ y: [0, -10, 0], x: [0, 8, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+        className="absolute top-[50%] right-[30%] w-48 h-48 rounded-full bg-blue-500/5 blur-[60px] z-[1]"
+      />
+
       {/* Bottom fade */}
       <div className="absolute bottom-0 w-full h-64 bg-gradient-to-t from-background to-transparent z-[1]" />
 
@@ -65,7 +114,7 @@ export function Hero() {
                 key={i}
                 src={src}
                 alt="Avatar"
-                className="w-8 h-8 rounded-full border-2 border-background object-cover relative z-[3-i]"
+                className="w-8 h-8 rounded-full border-2 border-background object-cover relative"
                 style={{ zIndex: 3 - i }}
               />
             ))}
@@ -75,17 +124,22 @@ export function Hero() {
           </span>
         </motion.div>
 
-        {/* H1 */}
+        {/* H1 - Character stagger */}
         <motion.h1
-          {...textReveal(0.1)}
+          variants={headlineContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
           className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-medium tracking-[-1.5px] md:tracking-[-2px] max-w-5xl leading-[1.05] md:leading-[1.02] text-foreground"
         >
-          Get <span className="font-serif italic font-normal text-foreground">Expert</span> Knowledge
+          <SplitText>Get </SplitText>
+          <SplitText className="font-serif italic font-normal">Expert</SplitText>
+          <SplitText> Knowledge</SplitText>
         </motion.h1>
 
         {/* Subhead */}
         <motion.p
-          {...fadeUp(0.25)}
+          {...fadeUp(0.4)}
           className="text-base sm:text-lg max-w-2xl mt-6 sm:mt-8 mx-auto text-[color:var(--color-hero-subtitle)]"
         >
           Guidenza – expert-led courses and trusted knowledge from real specialists. Discover varied approaches and topics in one seamless ecosystem.
@@ -93,7 +147,7 @@ export function Hero() {
 
         {/* Form */}
         <motion.form
-          {...fadeUp(0.4)}
+          {...fadeUp(0.6)}
           onSubmit={handleSubmit}
           className="liquid-glass rounded-full p-1.5 sm:p-2 max-w-lg w-full mt-8 sm:mt-10 md:mt-12 flex items-center gap-1.5 sm:gap-2 mx-auto"
         >
@@ -107,6 +161,9 @@ export function Hero() {
             required
           />
           <motion.button
+            ref={magnetic.ref as React.Ref<HTMLButtonElement>}
+            onMouseMove={magnetic.onMouseMove}
+            onMouseLeave={magnetic.onMouseLeave}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
             type="submit"

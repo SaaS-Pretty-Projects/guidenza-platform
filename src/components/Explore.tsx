@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { CoursePreview } from './CoursePreview';
+import { GridCardSkeleton } from './Skeleton';
 
 interface Course {
   id: string;
@@ -46,7 +47,17 @@ export function Explore() {
     : courses.filter(c => c.categories?.includes(selectedCategory));
 
   if (loading) {
-    return <div className="min-h-screen pt-32 px-6 flex items-center justify-center text-muted-foreground">Loading courses...</div>;
+    return (
+      <div className="min-h-screen pt-32 pb-20 px-6 max-w-7xl mx-auto">
+        <div className="h-10 bg-white/5 rounded-lg w-48 mb-8 animate-pulse" />
+        <div className="flex flex-wrap gap-2 mb-12">
+          {[0,1,2,3,4].map(i => <div key={i} className="h-9 w-24 rounded-full bg-white/5 animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[0,1,2,3,4,5].map(i => <GridCardSkeleton key={i} />)}
+        </div>
+      </div>
+    );
   }
 
   return (

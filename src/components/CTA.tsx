@@ -2,6 +2,24 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { fadeUp, textReveal, cinematicSection } from '../lib/animations';
 import { Logo } from './Logo';
+import { useMagnetic } from '../hooks/useMagnetic';
+
+function MagneticButton({ children, className }: { children: React.ReactNode; className: string }) {
+  const { ref, onMouseMove, onMouseLeave } = useMagnetic(0.25);
+
+  return (
+    <motion.button
+      ref={ref as React.Ref<HTMLButtonElement>}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.98 }}
+      className={className}
+    >
+      {children}
+    </motion.button>
+  );
+}
 
 export function CTA() {
   return (
@@ -43,20 +61,12 @@ export function CTA() {
           {...fadeUp(0.3)}
           className="flex flex-col sm:flex-row items-center gap-4 mt-10"
         >
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-            className="bg-foreground text-background rounded-lg px-8 py-3.5 text-sm font-semibold w-full sm:w-auto"
-          >
+          <MagneticButton className="bg-foreground text-background rounded-lg px-8 py-3.5 text-sm font-semibold w-full sm:w-auto">
             Explore Courses
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-            className="liquid-glass border border-white/10 rounded-lg px-8 py-3.5 text-sm font-semibold w-full sm:w-auto"
-          >
+          </MagneticButton>
+          <MagneticButton className="liquid-glass border border-white/10 rounded-lg px-8 py-3.5 text-sm font-semibold w-full sm:w-auto">
             Become an Instructor
-          </motion.button>
+          </MagneticButton>
         </motion.div>
       </div>
     </motion.section>

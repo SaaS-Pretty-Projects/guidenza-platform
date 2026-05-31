@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { fadeUp } from '../lib/animations';
-import { Compass, MonitorPlay, LayoutTemplate, Scale, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import { CardSkeleton } from './Skeleton';
 import { db } from '../lib/firebase';
 import { collection, getDocs, limit, query, doc, getDoc } from 'firebase/firestore';
 import { CoursePreview } from './CoursePreview';
@@ -87,6 +88,11 @@ export function Solution() {
         {/* Right Column - Course Cards */}
         <div className="lg:col-span-7 flex flex-col gap-6">
           <div className="text-sm uppercase tracking-[2px] text-muted-foreground mb-2">Featured Courses</div>
+          {courses.length === 0 && (
+            <>
+              {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
+            </>
+          )}
           {courses.map((course, i) => {
             const isEnrolled = enrolledIds.includes(course.id);
             return (
