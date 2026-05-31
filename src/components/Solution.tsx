@@ -22,6 +22,7 @@ interface Course {
 export function Solution() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [enrolledIds, setEnrolledIds] = useState<string[]>([]);
   const { user } = useAuth();
@@ -38,6 +39,7 @@ export function Solution() {
         setCourses(data);
       } catch (err) {
         console.error("Error fetching courses", err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -96,7 +98,10 @@ export function Solution() {
               {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
             </>
           )}
-          {!loading && courses.length === 0 && (
+          {!loading && error && (
+            <div className="py-12 text-center text-muted-foreground">Couldn't load courses. Please try again.</div>
+          )}
+          {!loading && !error && courses.length === 0 && (
             <div className="py-12 text-center text-muted-foreground">No courses available yet.</div>
           )}
           {courses.map((course, i) => {
