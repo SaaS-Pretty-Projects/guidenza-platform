@@ -201,6 +201,9 @@ export function Navbar() {
                 </button>
               </motion.div>
             )}
+            <motion.div variants={itemVariants} className="pt-2 relative w-full">
+              <SearchBar />
+            </motion.div>
             <motion.div variants={itemVariants} className="flex items-center gap-4 pt-4 border-t border-border/30">
               {[Instagram, Linkedin, Twitter].map((Icon, i) => (
                 <motion.button 
