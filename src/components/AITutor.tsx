@@ -40,16 +40,16 @@ export function AITutor({ courseTitle, courseDescription, isOpen, onClose }: AIT
       toast.error(`Not enough credits. Need ${AI_TUTOR_COST} credits.`);
       return;
     }
-    if (!rateLimiter.consume()) {
-      toast.error('Daily tutor session limit reached (10/day). Try again tomorrow.');
-      return;
-    }
     if (tier === 'free') {
       const success = await spend(AI_TUTOR_COST, `AI Tutor session: ${courseTitle}`);
       if (!success) {
         toast.error(`Not enough credits. Need ${AI_TUTOR_COST} credits.`);
         return;
       }
+    }
+    if (!rateLimiter.consume()) {
+      toast.error('Daily tutor session limit reached (10/day). Try again tomorrow.');
+      return;
     }
     setSessionStarted(true);
     setMessages([{

@@ -35,16 +35,16 @@ export function AIQuiz({ courseTitle, courseDescription }: AIQuizProps) {
       toast.error(`Need ${QUIZ_COST} credits. You have ${credits}.`);
       return;
     }
-    if (!rateLimiter.consume()) {
-      toast.error('Daily quiz limit reached (5/day). Try again tomorrow.');
-      return;
-    }
     if (tier === 'free') {
       const success = await spend(QUIZ_COST, `AI Quiz: ${courseTitle}`);
       if (!success) {
         toast.error(`Need ${QUIZ_COST} credits. You have ${credits}.`);
         return;
       }
+    }
+    if (!rateLimiter.consume()) {
+      toast.error('Daily quiz limit reached (5/day). Try again tomorrow.');
+      return;
     }
 
     setLoading(true);
