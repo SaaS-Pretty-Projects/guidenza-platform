@@ -29,7 +29,7 @@ const CARDS = [
 
 export function SearchChanged() {
   return (
-    <section className="pt-52 md:pt-64 pb-20 px-6 md:px-8 max-w-7xl mx-auto">
+    <section className="pt-40 md:pt-52 lg:pt-64 pb-20 px-6 md:px-8 max-w-7xl mx-auto">
       {/* Header Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
         <motion.div {...fadeUp(0)} className="lg:col-span-7">

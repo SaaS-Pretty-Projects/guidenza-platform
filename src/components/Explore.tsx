@@ -51,10 +51,18 @@ export function Explore() {
 
   return (
     <div className="min-h-screen pt-32 pb-20 px-6 max-w-7xl mx-auto">
-      <h1 className="text-4xl font-semibold mb-8 tracking-[-0.5px]">Explore Courses</h1>
-      
+      <div className="mb-16">
+        <div className="text-xs uppercase tracking-[3px] text-muted-foreground mb-4">
+          Explore Courses
+        </div>
+        <h1 className="text-4xl md:text-5xl font-medium tracking-[-1px]">
+          Find your next{' '}
+          <span className="font-serif italic font-normal">expertise</span>
+        </h1>
+      </div>
+
       {/* Category Filters */}
-      <div className="flex flex-wrap gap-2 mb-12">
+      <div className="flex flex-wrap gap-2 mb-8">
         {CATEGORIES.map(category => (
           <button
             key={category}
@@ -75,7 +83,7 @@ export function Explore() {
           <div 
             key={course.id} 
             onClick={() => setSelectedCourse(course)}
-            className="liquid-glass rounded-3xl border border-white/5 overflow-hidden group cursor-pointer hover:bg-white-[0.03] transition-colors"
+            className="liquid-glass rounded-3xl border border-white/5 overflow-hidden group cursor-pointer hover:bg-white/[0.03] transition-colors"
           >
             <div className="h-48 bg-muted relative">
               <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

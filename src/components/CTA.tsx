@@ -46,14 +46,14 @@ export function CTA() {
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
-            className="bg-foreground text-background rounded-lg px-8 py-3.5 text-sm font-semibold w-full sm:w-auto"
+            className="bg-foreground text-background rounded-full px-8 py-3.5 text-sm font-semibold w-full sm:w-auto"
           >
             Explore Courses
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
-            className="liquid-glass border border-white/10 rounded-lg px-8 py-3.5 text-sm font-semibold w-full sm:w-auto"
+            className="liquid-glass border border-white/10 rounded-full px-8 py-3.5 text-sm font-semibold w-full sm:w-auto"
           >
             Become an Instructor
           </motion.button>
