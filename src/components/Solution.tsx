@@ -5,7 +5,7 @@ import { Compass, MonitorPlay, LayoutTemplate, Scale, CheckCircle2 } from 'lucid
 import { db } from '../lib/firebase';
 import { collection, getDocs, limit, query, doc, getDoc } from 'firebase/firestore';
 import { CoursePreview } from './CoursePreview';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Course {
   id: string;

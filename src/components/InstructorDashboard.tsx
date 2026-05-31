@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, TrendingUp, TrendingDown, Star, Search, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';

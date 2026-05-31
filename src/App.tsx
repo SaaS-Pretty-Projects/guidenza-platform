@@ -15,6 +15,7 @@ import { InstructorProfile } from './components/InstructorProfile';
 import { InstructorDashboard } from './components/InstructorDashboard';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
+import { AuthProvider } from './contexts/AuthContext';
 
 function SectionWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -45,6 +46,7 @@ function Landing() {
 export default function App() {
   return (
     <HelmetProvider>
+      <AuthProvider>
       <BrowserRouter>
         <div className="bg-background text-foreground min-h-screen font-sans overflow-x-hidden">
           <Toaster 
@@ -68,6 +70,7 @@ export default function App() {
           <Footer />
         </div>
       </BrowserRouter>
+      </AuthProvider>
     </HelmetProvider>
   );
 }

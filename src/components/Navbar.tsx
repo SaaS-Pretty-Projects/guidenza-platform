@@ -3,7 +3,7 @@ import { Logo } from './Logo';
 import { Instagram, Linkedin, Twitter, Menu, UserCircle, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SearchBar } from './SearchBar';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
 const NAV_LINKS = ['Explore', 'For Creators', 'Philosophy', 'Categories'];
