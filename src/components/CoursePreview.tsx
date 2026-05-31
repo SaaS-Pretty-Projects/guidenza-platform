@@ -275,7 +275,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-background border border-white/10 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative shadow-2xl custom-scrollbar"
+              className="bg-background border border-white/10 rounded-3xl w-full max-w-3xl max-h-[85dvh] overflow-y-auto relative shadow-2xl custom-scrollbar"
             >
               <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
                 <button
@@ -306,7 +306,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                 </div>
               </div>
 
-              <div className="p-8">
+              <div className="p-8 pb-24">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex flex-wrap gap-3">
                     <span className="px-3 py-1 rounded-full border border-white/10 text-xs font-medium bg-white/5">
@@ -344,7 +344,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                   {course.description}
                 </p>
 
-                <div className="flex flex-col sm:flex-row items-center gap-4 mb-12">
+                <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-background/95 backdrop-blur-sm border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 mt-4 z-10">
                   {!isEnrolled ? (
                     <>
                       <button 
