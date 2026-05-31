@@ -18,7 +18,6 @@ import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ScrollProgress } from './components/ScrollProgress';
 import { FilmGrain } from './components/FilmGrain';
-import { ScrollToTop } from './components/ScrollToTop';
 import { SectionDivider } from './components/SectionDivider';
 import { useLenis } from './hooks/useLenis';
 
@@ -63,7 +62,7 @@ function AnimatedRoutes() {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
       <motion.div key={location.pathname} {...pageTransition}>
         <Routes location={location}>
           <Route path="/" element={<Landing />} />
@@ -95,7 +94,6 @@ function AppShell() {
         }}
       />
       <Navbar />
-      <ScrollToTop />
       <AnimatedRoutes />
       <Footer />
     </div>
