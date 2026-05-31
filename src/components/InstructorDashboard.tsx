@@ -141,6 +141,7 @@ export function InstructorDashboard() {
       title: formData.title,
       description: formData.description,
       author: user.displayName || 'Anonymous',
+      instructorId: user.uid,
       price: Number(formData.price),
       thumbnail: formData.thumbnail,
       categories: categoriesArray,
