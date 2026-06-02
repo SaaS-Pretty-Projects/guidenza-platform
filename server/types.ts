@@ -11,6 +11,8 @@ export interface SafePayTransaction {
   status: 'pending' | 'completed' | 'failed';
 }
 
+import admin from 'firebase-admin';
+
 export interface OrderData {
   id?: string;
   userId: string;
@@ -19,7 +21,7 @@ export interface OrderData {
   currency: string;
   status: 'pending' | 'confirmed' | 'refunded';
   safePayTransactionId: string;
-  createdAt: Date;
+  createdAt: admin.firestore.FieldValue | FirebaseFirestore.Timestamp;
 }
 
 export interface SafePayWebhookPayload {
