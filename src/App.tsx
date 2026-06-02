@@ -13,6 +13,7 @@ import { Dashboard } from './components/Dashboard';
 import { Explore } from './components/Explore';
 import { InstructorProfile } from './components/InstructorProfile';
 import { InstructorDashboard } from './components/InstructorDashboard';
+import { CheckoutResult } from './pages/CheckoutResult';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/explore" element={<Explore />} />
             <Route path="/instructor/:authorName" element={<InstructorProfile />} />
             <Route path="/instructor-dashboard" element={<InstructorDashboard />} />
+            <Route path="/checkout-result" element={<CheckoutResult />} />
           </Routes>
           <Footer />
         </div>
