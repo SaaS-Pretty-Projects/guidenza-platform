@@ -1,0 +1,44 @@
+<h2>Phase 3 — Community & Engagement</h2>
+<p class="subtitle">Course forums, messaging, leaderboards, review polish</p>
+
+<div class="section">
+  <h3>Course Discussions</h3>
+  <div class="mockup" style="margin-bottom: 1rem;">
+    <div class="mockup-body" style="text-align: left; padding: 1rem; font-family: monospace; font-size: 0.85rem;">
+      <pre>courses/{courseId}/discussions/{id}
+  ├── title, body, authorId, authorName
+  ├── tags: string[]
+  ├── createdAt, lastActivityAt
+  └── replies/{replyId}
+        ├── body, authorId, authorName
+        └── createdAt</pre>
+    </div>
+  </div>
+
+  <h3>Direct Messaging (Student ↔ Instructor)</h3>
+  <div class="mockup" style="margin-bottom: 1rem;">
+    <div class="mockup-body" style="text-align: left; padding: 1rem; font-family: monospace; font-size: 0.85rem;">
+      <pre>conversations/{conversationId}
+  ├── participants: [uid1, uid2]
+  ├── lastMessage, lastMessageAt
+  └── messages/{messageId}
+        ├── fromUserId, body
+        └── createdAt</pre>
+    </div>
+  </div>
+
+  <h3>Leaderboards & Review Enhancements</h3>
+  <p>Leaderboards by learning time, completed courses, streaks. Reviews get verified-purchase badge, instructor responses, helpful votes.</p>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Community effect</h4>
+    <ul>
+      <li>Discussions increase course stickiness</li>
+      <li>Messaging enables student support</li>
+      <li>Leaderboards drive gamification</li>
+      <li>Review badges build trust for new buyers</li>
+    </ul>
+  </div>
+</div>

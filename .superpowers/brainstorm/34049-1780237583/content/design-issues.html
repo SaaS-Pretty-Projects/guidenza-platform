@@ -1,0 +1,146 @@
+<h2>Design inconsistencies found across the codebase</h2>
+<p class="subtitle">These are the concrete issues. We'll fix all of them — the question below is about one key direction choice.</p>
+
+<style>
+  .issues-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 32px; }
+  .issue-card { background: #0f0f0f; border: 1px solid #1e1e1e; border-radius: 12px; padding: 14px; }
+  .issue-tag { display: inline-block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; font-weight: 600; }
+  .tag-high { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+  .tag-mid { background: rgba(234,179,8,0.1); color: #ca8a04; border: 1px solid rgba(234,179,8,0.2); }
+  .tag-low { background: rgba(100,100,100,0.15); color: #666; border: 1px solid rgba(100,100,100,0.2); }
+  .issue-title { font-size: 12px; font-weight: 600; color: #ccc; margin-bottom: 4px; }
+  .issue-desc { font-size: 10px; color: #555; line-height: 1.5; }
+  .code-snip { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; padding: 5px 8px; font-size: 9px; color: #666; font-family: monospace; margin-top: 6px; }
+  .code-bad { color: #f87171; }
+  .code-good { color: #86efac; }
+
+  .dir-section { margin-top: 20px; }
+  .mock-explore { background:#0a0a0a; border:1px solid #1c1c1c; border-radius:12px; overflow:hidden; font-family:Inter,sans-serif; color:#fff; font-size:10px; }
+  .mock-page-a { padding: 14px; }
+  .mock-page-b { padding: 14px; }
+  .cat-pill { display:inline-block; padding:4px 10px; border-radius:20px; font-size:9px; margin-right:4px; margin-bottom:4px; }
+  .mock-course-card { background:#111; border:1px solid #1c1c1c; border-radius:10px; overflow:hidden; margin-bottom:6px; }
+  .mock-card-img { height:40px; background:#1a1a1a; width:100%; }
+  .mock-card-body { padding:8px 10px; }
+  .label-tag { font-size: 8px; color: #444; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+</style>
+
+<div class="issues-grid">
+  <div class="issue-card">
+    <span class="issue-tag tag-high">Inconsistency</span>
+    <div class="issue-title">Button shape split personality</div>
+    <div class="issue-desc">Hero + Navbar use <code style="color:#aaa">rounded-full</code>. CTA section uses <code style="color:#aaa">rounded-lg</code>. Same action, different shape on the same page.</div>
+    <div class="code-snip">
+      <span class="code-bad">CTA.tsx: rounded-lg px-8 py-3.5</span><br>
+      <span class="code-good">Should be: rounded-full px-8 py-3.5</span>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-high">Typo / broken</span>
+    <div class="issue-title">Hover colour class typo</div>
+    <div class="issue-desc">Both <code style="color:#aaa">Solution.tsx</code> and <code style="color:#aaa">Explore.tsx</code> use <code style="color:#f87171">hover:bg-white-[0.03]</code> — invalid Tailwind. Should be <code style="color:#86efac">hover:bg-white/[0.03]</code>. Hover effect is silently broken.</div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-high">Responsiveness</span>
+    <div class="issue-title">Footer 3-col grid breaks on tablet</div>
+    <div class="issue-desc">Footer links use <code style="color:#aaa">grid-cols-2 md:grid-cols-3</code> — on narrow tablets the third column orphans. Needs a proper responsive fallback.</div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-high">Responsiveness</span>
+    <div class="issue-title">No search on mobile navbar</div>
+    <div class="issue-desc">SearchBar is <code style="color:#aaa">hidden md:flex</code> — mobile users get no search at all. Should appear inside the mobile menu dropdown.</div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-mid">Inconsistency</span>
+    <div class="issue-title">Inner page headings don't match landing typography</div>
+    <div class="issue-desc">Explore + Dashboard use plain <code style="color:#aaa">text-4xl font-semibold</code>. Landing uses <code style="color:#aaa">tracking-[-2px]</code> with serif italic accents. Inner pages feel generic by comparison.</div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-mid">Responsiveness</span>
+    <div class="issue-title">SearchChanged section top padding</div>
+    <div class="issue-desc"><code style="color:#aaa">pt-52 md:pt-64</code> — no tablet breakpoint. On 768–1024px viewports this creates an awkward gap between hero and this section.</div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-mid">Inconsistency</span>
+    <div class="issue-title">Explore page has no visual identity</div>
+    <div class="issue-desc">Just a page title dropped into blank space. No overline label, no serif accent, no section structure — looks unfinished compared to everything else.</div>
+  </div>
+
+  <div class="issue-card">
+    <span class="issue-tag tag-low">Polish</span>
+    <div class="issue-title">CoursePreview modal scroll on mobile</div>
+    <div class="issue-desc">The modal doesn't account for mobile viewport height — on phones the enroll button can be hidden below the fold with no scroll indicator.</div>
+  </div>
+</div>
+
+<div class="dir-section">
+  <h3 style="margin-bottom:6px">One direction call: how should inner pages (Explore, Dashboard) feel?</h3>
+  <p class="subtitle" style="margin-bottom:16px">The landing is cinematic — full-bleed video, sticky scroll animations. Inner pages need a different register.</p>
+
+  <div class="options">
+    <div class="option" data-choice="product" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <div class="mock-explore">
+          <div class="mock-page-a">
+            <div class="label-tag">Explore Courses</div>
+            <div style="font-size:18px;font-weight:600;letter-spacing:-0.5px;margin-bottom:10px">Find your next <span style="font-style:italic;font-family:Georgia,serif;font-weight:400">expertise</span></div>
+            <div style="margin-bottom:10px">
+              <span class="cat-pill" style="background:#fff;color:#000">All</span>
+              <span class="cat-pill" style="background:#111;border:1px solid #1c1c1c;color:#666">React</span>
+              <span class="cat-pill" style="background:#111;border:1px solid #1c1c1c;color:#666">Business</span>
+            </div>
+            <div class="mock-course-card">
+              <div class="mock-card-img"></div>
+              <div class="mock-card-body">
+                <div style="font-size:10px;color:#aaa;font-weight:500">React Mastery</div>
+                <div style="font-size:8.5px;color:#555;margin-top:2px">By Alex Johnson · $129</div>
+              </div>
+            </div>
+            <div class="mock-course-card">
+              <div class="mock-card-img"></div>
+              <div class="mock-card-body">
+                <div style="font-size:10px;color:#aaa;font-weight:500">System Design</div>
+                <div style="font-size:8.5px;color:#555;margin-top:2px">By Sarah Chen · $149</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>A — Clean product UI</h3>
+        <p>Serif italic accent in the page title, overline label, clean grid. No video, no animations — fast and functional. Matches the landing's typography system without copying its dramatics.</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="cinematic" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <div class="mock-explore">
+          <div class="mock-page-b">
+            <div style="height:50px;background:linear-gradient(180deg,#111 0%,#0a0a0a 100%);border-radius:8px;margin-bottom:10px;display:flex;align-items:flex-end;padding:8px;border:1px solid #1c1c1c">
+              <div style="font-size:16px;font-weight:600;letter-spacing:-0.5px">Explore <span style="font-style:italic;font-family:Georgia,serif;font-weight:400">Courses</span></div>
+            </div>
+            <div style="margin-bottom:8px;display:flex;gap:4px;overflow:hidden">
+              <span class="cat-pill" style="background:#fff;color:#000">All</span>
+              <span class="cat-pill" style="background:#111;border:1px solid #1c1c1c;color:#666">React</span>
+              <span class="cat-pill" style="background:#111;border:1px solid #1c1c1c;color:#666">Business</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <div class="mock-course-card"><div class="mock-card-img" style="height:50px"></div><div class="mock-card-body"><div style="font-size:9.5px;color:#aaa">React Mastery</div></div></div>
+              <div class="mock-course-card"><div class="mock-card-img" style="height:50px"></div><div class="mock-card-body"><div style="font-size:9.5px;color:#aaa">System Design</div></div></div>
+              <div class="mock-course-card"><div class="mock-card-img" style="height:50px"></div><div class="mock-card-body"><div style="font-size:9.5px;color:#aaa">TypeScript Pro</div></div></div>
+              <div class="mock-course-card"><div class="mock-card-img" style="height:50px"></div><div class="mock-card-body"><div style="font-size:9.5px;color:#aaa">Product Thinking</div></div></div>
+            </div>
+          </div>
+        </div>
+        <h3>B — Mini hero banner per page</h3>
+        <p>Each inner page gets a compact dark header banner (no video, just gradient + title). More editorial, slightly heavier. Consistent with the landing's premium register.</p>
+      </div>
+    </div>
+  </div>
+</div>

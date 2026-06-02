@@ -1,0 +1,45 @@
+<h2>Phase 2 — Deep Learning Experience</h2>
+<p class="subtitle">Quizzes, enhanced progress, polished certificates</p>
+
+<div class="section">
+  <h3>Quiz Data Model</h3>
+  <div class="mockup" style="margin-bottom: 1rem;">
+    <div class="mockup-body" style="text-align: left; padding: 1rem; font-family: monospace; font-size: 0.85rem;">
+      <pre>courses/{courseId}/modules/{moduleId}/quizzes/{quizId}
+  ├── title: string
+  ├── questions: [
+  │     { id, questionText,
+  │       options: [A,B,C,D],
+  │       correctAnswer: number }
+  │   ]
+  ├── passingScore: number (70%)
+  └── maxAttempts: number</pre>
+    </div>
+  </div>
+
+  <h3>Quiz Attempts (per user)</h3>
+  <div class="mockup" style="margin-bottom: 1rem;">
+    <div class="mockup-body" style="text-align: left; padding: 1rem; font-family: monospace; font-size: 0.85rem;">
+      <pre>users/{uid}/quizAttempts/{attemptId}
+  ├── courseId, moduleId, quizId
+  ├── answers: [{ questionId, selectedAnswer, correct }]
+  ├── score: number (%)
+  ├── passed: boolean
+  └── completedAt: Timestamp</pre>
+    </div>
+  </div>
+
+  <h3>Progress Upgrade</h3>
+  <p>Module completion now requires: <strong>mark done + quiz passed</strong>. Course completion requires all modules done + all quizzes passed before certificate is issued.</p>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>What unlocks</h4>
+    <ul>
+      <li>Auto-graded quizzes for instructors</li>
+      <li>Meaningful progress (% by quiz score, not clickthrough)</li>
+      <li>Certificate only when mastery is demonstrated</li>
+    </ul>
+  </div>
+</div>

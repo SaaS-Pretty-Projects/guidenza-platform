@@ -1,0 +1,60 @@
+<h2>Approach: Phased Rollout</h2>
+<p class="subtitle">Given the scope (Payments + Quizzes + Community), a phased approach is safest</p>
+
+<div class="section">
+  <h3>Phase 1 — Course Commerce (SafePay)</h3>
+  <div class="mockup" style="margin-bottom: 1rem;">
+    <div class="mockup-header">Scope</div>
+    <div class="mockup-body" style="text-align: left; padding: 1rem;">
+      <ul>
+        <li>SafePay checkout flow (embed or redirect)</li>
+        <li>Purchase + enrollment gating (free preview, pay to unlock)</li>
+        <li>Course ownership records in Firestore</li>
+        <li>Order history + receipts</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Phase 2 — Deep Learning Experience</h3>
+  <div class="mockup" style="margin-bottom: 1rem;">
+    <div class="mockup-header">Scope</div>
+    <div class="mockup-body" style="text-align: left; padding: 1rem;">
+      <ul>
+        <li>Quizzes per module (MCQs, auto-grading)</li>
+        <li>Enhanced progress tracking (quiz scores, module mastery)</li>
+        <li>Polished certificate generation</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Phase 3 — Community & Engagement</h3>
+  <div class="mockup">
+    <div class="mockup-header">Scope</div>
+    <div class="mockup-body" style="text-align: left; padding: 1rem;">
+      <ul>
+        <li>Course forums / discussions</li>
+        <li>Student-instructor messaging</li>
+        <li>Rating & review enhancements</li>
+        <li>Student leaderboards</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Why this works</h4>
+    <ul>
+      <li>Shipping payments first = revenue sooner</li>
+      <li>Each phase is independently deployable</li>
+      <li>Ordered by value-to-effort ratio</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Trade-off</h4>
+    <ul>
+      <li>Quizzes delayed until Phase 2</li>
+      <li>Need to design data model up-front to avoid migrations</li>
+    </ul>
+  </div>
+</div>
