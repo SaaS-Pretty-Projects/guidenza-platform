@@ -49,12 +49,10 @@ export async function createTransaction(
 export async function handleWebhook(
   payload: SafePayWebhookPayload,
   signature: string,
+  rawBody?: string,
 ): Promise<void> {
-  // Verify webhook signature
-  const expectedSig = await computeHmac(
-    JSON.stringify(payload),
-    SAFEPAY_WEBHOOK_SECRET,
-  );
+  const bodyForHmac = rawBody ?? JSON.stringify(payload);
+  const expectedSig = await computeHmac(bodyForHmac, SAFEPAY_WEBHOOK_SECRET);
   if (signature !== expectedSig) {
     throw new Error('Invalid webhook signature');
   }

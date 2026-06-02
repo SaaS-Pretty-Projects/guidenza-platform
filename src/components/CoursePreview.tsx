@@ -121,22 +121,6 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     }
   }, [user?.uid, course?.id]);
 
-  const handleSaveCourse = async () => {
-    if (!user || !course) {
-      toast.error('Please sign in to enroll!');
-      return;
-    }
-    toast.loading('Enrolling...', { id: 'enroll' });
-    try {
-      await enrollInCourse(user.uid, course.id, course.title);
-      setIsEnrolled(true);
-      toast.success('Successfully enrolled!', { id: 'enroll' });
-    } catch (err) {
-      console.error('Error enrolling', err);
-      toast.error('Failed to enroll.', { id: 'enroll' });
-    }
-  };
-
   const handleToggleWishlist = async () => {
     if (!user || !course) {
       toast.error("Please sign in to wishlist courses!");

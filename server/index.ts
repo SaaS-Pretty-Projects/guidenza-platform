@@ -44,8 +44,9 @@ app.post('/api/checkout', async (req, res) => {
 app.post('/api/webhook/safepay', async (req, res) => {
   try {
     const signature = req.headers['x-safepay-signature'] as string;
-    const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    await handleWebhook(payload, signature);
+    const rawBody = req.body as string;
+    const payload = JSON.parse(rawBody);
+    await handleWebhook(payload, signature, rawBody);
     res.sendStatus(200);
   } catch (err) {
     console.error('Webhook error:', err);

@@ -1,7 +1,9 @@
 import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env.VITE_API_URL)
+  ? import.meta.env.VITE_API_URL
+  : 'http://localhost:4000/api';
 
 export interface Order {
   id: string;
@@ -18,8 +20,10 @@ export async function hasPurchasedCourse(uid: string, courseId: string): Promise
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) return false;
-  const purchasedCourses: string[] = snap.data().purchasedCourses ?? [];
-  return purchasedCourses.includes(courseId);
+  const data = snap.data();
+  const purchasedCourses: string[] = data.purchasedCourses ?? [];
+  const enrolledCourses: string[] = data.enrolledCourses ?? [];
+  return purchasedCourses.includes(courseId) || enrolledCourses.includes(courseId);
 }
 
 export async function getUserOrders(uid: string): Promise<Order[]> {
