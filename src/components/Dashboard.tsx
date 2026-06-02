@@ -8,6 +8,7 @@ import { relativeTime } from '../lib/relativeTime';
 import { getWeekDots } from '../lib/learningData';
 import { fadeUp } from '../lib/animations';
 import { CoursePreview } from './CoursePreview';
+import { OrderHistory } from './OrderHistory';
 import toast from 'react-hot-toast';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -325,6 +326,11 @@ export function Dashboard() {
           </div>
         )}
       </motion.div>
+
+      {/* Order History */}
+      <div className="mt-8">
+        <OrderHistory />
+      </div>
 
       {/* CoursePreview modal — opened by Resume button */}
       <CoursePreview
