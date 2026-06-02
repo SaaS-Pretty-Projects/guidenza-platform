@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import admin from 'firebase-admin';
 import { db } from './firebase.js';
+import { createTransaction, handleWebhook } from './safePay.js';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
@@ -19,22 +20,21 @@ app.post('/api/checkout', async (req, res) => {
       return;
     }
 
+    // Create SafePay transaction
+    const txn = await createTransaction({ userId, courseId, amount, currency: currency ?? 'PKR' });
+
     // Create pending order
-    const orderRef = await db.collection('orders').add({
+    await db.collection('orders').add({
       userId,
       courseId,
       amount,
       currency: currency ?? 'PKR',
       status: 'pending',
-      safePayTransactionId: '',
+      safePayTransactionId: txn.transactionId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Return a checkout URL pattern (SafePay will be integrated in Task 2)
-    res.json({
-      checkoutUrl: `${CLIENT_ORIGIN}/checkout-result?order_id=${orderRef.id}&course_id=${courseId}`,
-      transactionId: orderRef.id,
-    });
+    res.json({ checkoutUrl: txn.checkoutUrl, transactionId: txn.transactionId });
   } catch (err) {
     console.error('Checkout error:', err);
     res.status(500).json({ error: 'Failed to create checkout' });
@@ -43,8 +43,9 @@ app.post('/api/checkout', async (req, res) => {
 
 app.post('/api/webhook/safepay', async (req, res) => {
   try {
+    const signature = req.headers['x-safepay-signature'] as string;
     const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    console.log('Webhook received:', payload);
+    await handleWebhook(payload, signature);
     res.sendStatus(200);
   } catch (err) {
     console.error('Webhook error:', err);
