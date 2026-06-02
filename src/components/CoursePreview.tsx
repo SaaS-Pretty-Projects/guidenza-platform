@@ -9,6 +9,9 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { jsPDF } from 'jspdf';
 import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, CourseModule } from '../lib/learningData';
+import { CheckoutButton } from './CheckoutButton';
+import { PurchaseGate } from './PurchaseGate';
+import { hasPurchasedCourse } from '../lib/orders';
 
 interface Course {
   id: string;
@@ -48,6 +51,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [moduleList, setModuleList] = useState<CourseModule[]>([]);
   const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
   const [markingDone, setMarkingDone] = useState<string | null>(null);
+  const [purchased, setPurchased] = useState(false);
 
   useEffect(() => {
     if (user && course) {
@@ -61,6 +65,8 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
           const enrolled = enrolledCourses.includes(course.id);
           setIsEnrolled(enrolled);
           setIsWishlisted(wishlist.includes(course.id));
+          const purchasedCourses: string[] = data.purchasedCourses ?? [];
+          setPurchased(purchasedCourses.includes(course.id));
 
           if (enrolled) {
             const progress = await getProgressForCourse(user.uid, course.id);
@@ -371,66 +377,82 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                   {course.description}
                 </p>
 
-                {isEnrolled && moduleList.length > 0 && (
-                  <div className="mt-8 mb-4">
-                    <h3 className="text-xs uppercase tracking-[3px] text-muted-foreground mb-4">
-                      Modules
-                    </h3>
-                    <div className="flex flex-col gap-2">
-                      {moduleList.map((mod) => {
-                        const done = completedModuleIds.includes(mod.id);
-                        const loading = markingDone === mod.id;
-                        return (
-                          <div
-                            key={mod.id}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
-                              done
-                                ? 'border-white/5 bg-white/[0.02]'
-                                : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
-                            }`}
-                          >
-                            <div
-                              className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
-                                done ? 'bg-white/10 border-white/20' : 'border-white/20'
-                              }`}
-                            >
-                              {done && <CheckCircle2 size={12} className="text-white/60" />}
-                            </div>
-                            <span
-                              className={`flex-1 text-sm ${
-                                done ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'
-                              }`}
-                            >
-                              {mod.title}
-                            </span>
-                            {!done && (
-                              <button
-                                onClick={() => handleMarkDone(mod.id, mod.title)}
-                                disabled={loading}
-                                className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
-                              >
-                                {loading ? '...' : 'Mark done'}
-                              </button>
-                            )}
+                {/* Modules section - gated */}
+                <div className="mt-8 mb-4">
+                  <h3 className="text-xs uppercase tracking-[3px] text-muted-foreground mb-4">
+                    Modules
+                  </h3>
+                  <PurchaseGate
+                    courseId={course.id}
+                    amount={course.price}
+                    preview={
+                      <div className="flex flex-col gap-2">
+                        {moduleList.slice(0, 1).map((mod) => (
+                          <div key={mod.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/5 bg-white/[0.02]">
+                            <div className="w-4 h-4 rounded border border-white/20 flex-shrink-0" />
+                            <span className="flex-1 text-sm text-muted-foreground">{mod.title}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                        ))}
+                        {moduleList.length > 1 && (
+                          <p className="text-xs text-muted-foreground/50 text-center py-2">
+                            + {moduleList.length - 1} more modules
+                          </p>
+                        )}
+                      </div>
+                    }
+                    full={
+                      <div className="flex flex-col gap-2">
+                        {moduleList.map((mod) => {
+                          const done = completedModuleIds.includes(mod.id);
+                          const loading = markingDone === mod.id;
+                          return (
+                            <div
+                              key={mod.id}
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                                done
+                                  ? 'border-white/5 bg-white/[0.02]'
+                                  : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
+                                  done ? 'bg-white/10 border-white/20' : 'border-white/20'
+                                }`}
+                              >
+                                {done && <CheckCircle2 size={12} className="text-white/60" />}
+                              </div>
+                              <span
+                                className={`flex-1 text-sm ${
+                                  done ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'
+                                }`}
+                              >
+                                {mod.title}
+                              </span>
+                              {!done && (
+                                <button
+                                  onClick={() => handleMarkDone(mod.id, mod.title)}
+                                  disabled={loading}
+                                  className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
+                                >
+                                  {loading ? '...' : 'Mark done'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    }
+                  />
+                </div>
 
                 <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-background/95 backdrop-blur-sm border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 mt-4 z-10">
-                  {!isEnrolled ? (
-                    <button
-                      onClick={handleSaveCourse}
-                      className="w-full sm:w-auto px-8 py-3 bg-foreground text-background font-semibold rounded-full hover:scale-[1.02] transition-transform"
-                    >
-                      Enroll for ${course.price}
-                    </button>
-                  ) : (
+                  {!isEnrolled && !purchased && (
+                    <CheckoutButton courseId={course.id} amount={course.price} />
+                  )}
+                  {(isEnrolled || purchased) && (
                     <>
                       <span className="text-sm font-medium text-green-400 flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-4 py-2 rounded-full">
-                        <CheckCircle2 size={16} /> Enrolled
+                        <CheckCircle2 size={16} /> {isEnrolled ? 'Enrolled' : 'Purchased'}
                       </span>
                       {progressPercent === 100 && (
                         <button
