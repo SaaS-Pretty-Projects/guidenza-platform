@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useDashboard, CourseWithModules } from '../hooks/useDashboard';
 import { relativeTime } from '../lib/relativeTime';
 import { getWeekDots } from '../lib/learningData';
+import { generateCertificatePdf } from '../lib/certificate';
 import { fadeUp } from '../lib/animations';
 import { CoursePreview } from './CoursePreview';
 import { OrderHistory } from './OrderHistory';
@@ -201,7 +202,7 @@ export function Dashboard() {
                     </p>
                   </div>
                   <button
-                    onClick={() => toast('PDF certificates coming soon')}
+                    onClick={() => generateCertificatePdf(user?.displayName ?? 'Student', cert.courseName, cert.issuedAt?.toDate())}
                     className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors flex-shrink-0"
                   >
                     Download
