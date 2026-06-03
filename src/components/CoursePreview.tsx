@@ -8,7 +8,9 @@ import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { jsPDF } from 'jspdf';
-import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, CourseModule } from '../lib/learningData';
+import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, markQuizPassed, CourseModule } from '../lib/learningData';
+import { getModuleQuizzes, hasPassedQuiz, type Quiz } from '../lib/quizzes';
+import { QuizViewer } from './QuizViewer';
 import { CheckoutButton } from './CheckoutButton';
 import { PurchaseGate } from './PurchaseGate';
 import { hasPurchasedCourse } from '../lib/orders';
@@ -50,6 +52,9 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [sortOrder, setSortOrder] = useState<'newest' | 'highest' | 'lowest'>('newest');
   const [moduleList, setModuleList] = useState<CourseModule[]>([]);
   const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
+  const [quizPassedModuleIds, setQuizPassedModuleIds] = useState<string[]>([]);
+  const [moduleQuizzes, setModuleQuizzes] = useState<Record<string, Quiz[]>>({});
+  const [activeQuiz, setActiveQuiz] = useState<{ moduleId: string; quiz: Quiz } | null>(null);
   const [markingDone, setMarkingDone] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
 
@@ -73,9 +78,11 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
             const completed = progress?.completedModules ?? [];
             setCompletedModuleIds(completed);
             setCompletedModules(completed.length);
+            setQuizPassedModuleIds(progress?.quizPassedModules ?? []);
           } else {
             setCompletedModules(0);
             setCompletedModuleIds([]);
+            setQuizPassedModuleIds([]);
           }
         }
       };
@@ -113,6 +120,22 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     if (!course) { setModuleList([]); return; }
     setModuleList(course.modules ?? []);
   }, [course]);
+
+  // Effect: fetch quizzes per module
+  useEffect(() => {
+    if (!user || !isEnrolled || !course || moduleList.length === 0) return;
+    let cancelled = false;
+    const fetchQuizzes = async () => {
+      const result: Record<string, Quiz[]> = {};
+      for (const mod of moduleList) {
+        const qs = await getModuleQuizzes(course.id, mod.id);
+        if (!cancelled) result[mod.id] = qs;
+      }
+      if (!cancelled) setModuleQuizzes(result);
+    };
+    fetchQuizzes();
+    return () => { cancelled = true; };
+  }, [user, isEnrolled, course, moduleList.length]);
 
   // Effect: streak tracking — fires when enrollment confirmed
   useEffect(() => {
@@ -152,6 +175,20 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       console.error("Failed to toggle wishlist", err);
       toast.error("Wishlist update failed");
     }
+  };
+
+  const handleQuizPassed = async (moduleId: string) => {
+    if (!user || !course) return;
+    setQuizPassedModuleIds((prev) => [...prev, moduleId]);
+    try {
+      await markQuizPassed(user.uid, course.id, moduleId, course.title);
+    } catch (err) {
+      console.error('Failed to record quiz pass', err);
+    }
+  };
+
+  const handleStartQuiz = (moduleId: string, quiz: Quiz) => {
+    setActiveQuiz({ moduleId, quiz });
   };
 
   const handleMarkDone = async (moduleId: string, moduleName: string) => {
@@ -388,7 +425,9 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                       <div className="flex flex-col gap-2">
                         {moduleList.map((mod) => {
                           const done = completedModuleIds.includes(mod.id);
+                          const quizPassed = quizPassedModuleIds.includes(mod.id);
                           const loading = markingDone === mod.id;
+                          const quizzes = moduleQuizzes[mod.id];
                           return (
                             <div
                               key={mod.id}
@@ -412,15 +451,28 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                               >
                                 {mod.title}
                               </span>
-                              {!done && (
-                                <button
-                                  onClick={() => handleMarkDone(mod.id, mod.title)}
-                                  disabled={loading}
-                                  className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
-                                >
-                                  {loading ? '...' : 'Mark done'}
-                                </button>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {done && quizzes && quizzes.length > 0 && !quizPassed && (
+                                  <button
+                                    onClick={() => handleStartQuiz(mod.id, quizzes[0])}
+                                    className="text-xs text-foreground border border-white/20 rounded-lg px-3 py-1 hover:bg-white/10 transition-colors"
+                                  >
+                                    Quiz
+                                  </button>
+                                )}
+                                {quizPassed && (
+                                  <span className="text-xs text-green-400 font-medium">Quiz passed</span>
+                                )}
+                                {!done && (
+                                  <button
+                                    onClick={() => handleMarkDone(mod.id, mod.title)}
+                                    disabled={loading}
+                                    className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
+                                  >
+                                    {loading ? '...' : 'Mark done'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -428,6 +480,32 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                     }
                   />
                 </div>
+
+                {/* QuizViewer sub-modal */}
+                {activeQuiz && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+                    onClick={() => setActiveQuiz(null)}
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-background border border-white/10 rounded-3xl w-full max-w-lg max-h-[80dvh] overflow-y-auto p-6 shadow-2xl custom-scrollbar"
+                    >
+                      <QuizViewer
+                        courseId={course.id}
+                        moduleId={activeQuiz.moduleId}
+                        quiz={activeQuiz.quiz}
+                        onQuizPassed={() => handleQuizPassed(activeQuiz.moduleId)}
+                        onClose={() => setActiveQuiz(null)}
+                      />
+                    </motion.div>
+                  </motion.div>
+                )}
 
                 <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-background/95 backdrop-blur-sm border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 mt-4 z-10">
                   {!isEnrolled && !purchased && (
