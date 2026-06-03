@@ -10,11 +10,25 @@ View your app in AI Studio: https://ai.studio/apps/626d9853-0329-420d-89f0-0de4a
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## VS Code IDE Integration
+
+If you want Command Code integration in VS Code, install the Command Code CLI globally and use the built-in workspace tasks:
+
+- `npm i -g command-code@latest`
+- `cmd --ide-setup` to initialize the IDE extension connection
+- `cmd` to start a Command Code session in your project
+
+You can also run the tasks from VS Code via `Terminal > Run Task...` and choose:
+
+- `Command Code: IDE Setup`
+- `Command Code: Start Session`
+
+For interactive reconnection diagnostics from within a Command Code session, run `/ide`.

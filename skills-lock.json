@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "branch-finalization": {
+      "source": "qodex-ai/ai-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/branch-finalization/SKILL.md",
+      "computedHash": "51eb793e42460d0def2e3f3ffe5a468514c99951d9385dbf6341d5d0a8c2d104"
+    },
+    "dispatching-parallel-agents": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "skillPath": "cli-tool/components/skills/ai-research/dispatching-parallel-agents/SKILL.md",
+      "computedHash": "534432f7d0af6f567ec505ef251e6bbf0a8f2d12a34d9da9517fb131dd9c8646"
+    },
+    "receiving-code-review": {
+      "source": "iliaal/ai-skills",
+      "sourceType": "github",
+      "skillPath": "skills/receiving-code-review/SKILL.md",
+      "computedHash": "b375aaf54ee5a534730e691e405345f76e53ca9a38a3f2e1a56dae55b8610024"
+    }
+  }
+}
