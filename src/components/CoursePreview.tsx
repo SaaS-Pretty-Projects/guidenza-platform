@@ -10,7 +10,13 @@ import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, ge
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { jsPDF } from 'jspdf';
+import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, markQuizPassed, CourseModule } from '../lib/learningData';
+import { generateCertificatePdf } from '../lib/certificate';
+import { getModuleQuizzes, hasPassedQuiz, type Quiz } from '../lib/quizzes';
+import { QuizViewer } from './QuizViewer';
+import { CheckoutButton } from './CheckoutButton';
+import { PurchaseGate } from './PurchaseGate';
+import { hasPurchasedCourse } from '../lib/orders';
 
 interface Course {
   id: string;
@@ -21,6 +27,7 @@ interface Course {
   thumbnail: string;
   totalModules?: number;
   categories?: string[];
+  modules?: CourseModule[];
 }
 
 interface Review {
@@ -47,6 +54,13 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'highest' | 'lowest'>('newest');
+  const [moduleList, setModuleList] = useState<CourseModule[]>([]);
+  const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
+  const [quizPassedModuleIds, setQuizPassedModuleIds] = useState<string[]>([]);
+  const [moduleQuizzes, setModuleQuizzes] = useState<Record<string, Quiz[]>>({});
+  const [activeQuiz, setActiveQuiz] = useState<{ moduleId: string; quiz: Quiz } | null>(null);
+  const [markingDone, setMarkingDone] = useState<string | null>(null);
+  const [purchased, setPurchased] = useState(false);
 
   useEffect(() => {
     if (user && course) {
@@ -55,15 +69,24 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
         const snap = await getDoc(userRef);
         if (snap.exists()) {
           const data = snap.data();
-          const savedCourses = data.savedCourses || [];
-          const wishlist = data.wishlist || [];
-          setIsEnrolled(savedCourses.includes(course.id));
+          const enrolledCourses: string[] = data.enrolledCourses || [];
+          const wishlist: string[] = data.wishlist || [];
+          const enrolled = enrolledCourses.includes(course.id);
+          setIsEnrolled(enrolled);
           setIsWishlisted(wishlist.includes(course.id));
-          
-          if (data.progress && data.progress[course.id]) {
-            setCompletedModules(data.progress[course.id]);
+          const purchasedCourses: string[] = data.purchasedCourses ?? [];
+          setPurchased(purchasedCourses.includes(course.id));
+
+          if (enrolled) {
+            const progress = await getProgressForCourse(user.uid, course.id);
+            const completed = progress?.completedModules ?? [];
+            setCompletedModuleIds(completed);
+            setCompletedModules(completed.length);
+            setQuizPassedModuleIds(progress?.quizPassedModules ?? []);
           } else {
             setCompletedModules(0);
+            setCompletedModuleIds([]);
+            setQuizPassedModuleIds([]);
           }
         }
       };
@@ -96,10 +119,32 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     }
   }, [course]);
 
-  const handleSaveCourse = async () => {
-    if (!user) {
-      toast.error("Please sign in to enroll!");
-      return;
+  // Effect: derive moduleList from course (sync only)
+  useEffect(() => {
+    if (!course) { setModuleList([]); return; }
+    setModuleList(course.modules ?? []);
+  }, [course]);
+
+  // Effect: fetch quizzes per module
+  useEffect(() => {
+    if (!user || !isEnrolled || !course || moduleList.length === 0) return;
+    let cancelled = false;
+    const fetchQuizzes = async () => {
+      const result: Record<string, Quiz[]> = {};
+      for (const mod of moduleList) {
+        const qs = await getModuleQuizzes(course.id, mod.id);
+        if (!cancelled) result[mod.id] = qs;
+      }
+      if (!cancelled) setModuleQuizzes(result);
+    };
+    fetchQuizzes();
+    return () => { cancelled = true; };
+  }, [user, isEnrolled, course, moduleList.length]);
+
+  // Effect: streak tracking — fires when enrollment confirmed
+  useEffect(() => {
+    if (user && isEnrolled && course) {
+      recordCourseOpen(user.uid).catch(console.error);
     }
     const price = course?.price || 0;
     const creditCost = price * 100;
@@ -178,17 +223,47 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     }
   };
 
-  const handleContinue = async () => {
+  const handleQuizPassed = async (moduleId: string) => {
     if (!user || !course) return;
-    const nextMod = Math.min((completedModules || 0) + 1, course.totalModules || 12);
-    setCompletedModules(nextMod);
+    setQuizPassedModuleIds((prev) => [...prev, moduleId]);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        [`progress.${course.id}`]: nextMod
-      });
-      toast.success("Progress saved!");
-    } catch(err) {
-      toast.error("Failed to save progress");
+      await markQuizPassed(user.uid, course.id, moduleId, course.title);
+    } catch (err) {
+      console.error('Failed to record quiz pass', err);
+    }
+  };
+
+  const handleStartQuiz = (moduleId: string, quiz: Quiz) => {
+    setActiveQuiz({ moduleId, quiz });
+  };
+
+  const handleMarkDone = async (moduleId: string, moduleName: string) => {
+    if (!user || !course) return;
+    setMarkingDone(moduleId);
+    setCompletedModuleIds((prev) => [...prev, moduleId]);
+    setCompletedModules((prev) => prev + 1);
+    try {
+      const totalMods = moduleList.length || course.totalModules || 8;
+      const { certificateEarned } = await markModuleComplete(
+        user.uid,
+        course.id,
+        moduleId,
+        moduleName,
+        course.title,
+        totalMods,
+      );
+      if (certificateEarned) {
+        toast.success('🏆 Course complete — certificate earned!');
+      } else {
+        toast.success('Module complete!');
+      }
+    } catch (err) {
+      setCompletedModuleIds((prev) => prev.filter((id) => id !== moduleId));
+      setCompletedModules((prev) => prev - 1);
+      console.error('Failed to mark module done', err);
+      toast.error('Failed to save progress');
+    } finally {
+      setMarkingDone(null);
     }
   };
 
@@ -218,51 +293,10 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
 
   const handleDownloadCertificate = () => {
     if (!user || !course) return;
-    const padding = 20;
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    doc.setFillColor(245, 245, 245);
-    doc.rect(0, 0, 297, 210, 'F');
-    doc.setLineWidth(2);
-    doc.setDrawColor(40, 40, 40);
-    doc.rect(padding, padding, 297 - 2 * padding, 210 - 2 * padding, 'S');
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(40);
-    doc.setTextColor(30, 30, 30);
-    doc.text("Certificate of Completion", 148.5, 60, { align: "center" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(16);
-    doc.text("This is to certify that", 148.5, 90, { align: "center" });
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(30);
-    doc.text(user.displayName || 'Student', 148.5, 110, { align: "center" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(16);
-    doc.text("has successfully completed the course", 148.5, 130, { align: "center" });
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(24);
-    doc.setTextColor(50, 100, 200);
-    const titleLines = doc.splitTextToSize(course.title, 200);
-    doc.text(titleLines, 148.5, 150, { align: "center" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Date of Completion: ${new Date().toLocaleDateString()}`, 148.5, 175, { align: "center" });
-
-    doc.save(`Certificate_${course.title.replace(/\s+/g, '_')}.pdf`);
+    generateCertificatePdf(user.displayName || 'Student', course.title);
   };
 
-  const totalMod = course?.totalModules || 12;
+  const totalMod = moduleList.length || course?.totalModules || 8;
   const progressPercent = Math.round((completedModules / totalMod) * 100);
 
   const sortedReviews = useMemo(() => {
@@ -306,7 +340,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-background border border-white/10 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative shadow-2xl custom-scrollbar"
+              className="bg-background border border-white/10 rounded-3xl w-full max-w-3xl max-h-[85dvh] overflow-y-auto relative shadow-2xl custom-scrollbar"
             >
               <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
                 <button
@@ -337,7 +371,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                 </div>
               </div>
 
-              <div className="p-8">
+              <div className="p-8 pb-24">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex flex-wrap gap-3">
                     <span className="px-3 py-1 rounded-full border border-white/10 text-xs font-medium bg-white/5">
@@ -375,31 +409,126 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                   {course.description}
                 </p>
 
-                <div className="flex flex-col sm:flex-row items-center gap-4 mb-12">
-                  {!isEnrolled ? (
+                {/* Modules section - gated */}
+                <div className="mt-8 mb-4">
+                  <h3 className="text-xs uppercase tracking-[3px] text-muted-foreground mb-4">
+                    Modules
+                  </h3>
+                  <PurchaseGate
+                    courseId={course.id}
+                    amount={course.price}
+                    preview={
+                      <div className="flex flex-col gap-2">
+                        {moduleList.slice(0, 1).map((mod) => (
+                          <div key={mod.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/5 bg-white/[0.02]">
+                            <div className="w-4 h-4 rounded border border-white/20 flex-shrink-0" />
+                            <span className="flex-1 text-sm text-muted-foreground">{mod.title}</span>
+                          </div>
+                        ))}
+                        {moduleList.length > 1 && (
+                          <p className="text-xs text-muted-foreground/50 text-center py-2">
+                            + {moduleList.length - 1} more modules
+                          </p>
+                        )}
+                      </div>
+                    }
+                    full={
+                      <div className="flex flex-col gap-2">
+                        {moduleList.map((mod) => {
+                          const done = completedModuleIds.includes(mod.id);
+                          const quizPassed = quizPassedModuleIds.includes(mod.id);
+                          const loading = markingDone === mod.id;
+                          const quizzes = moduleQuizzes[mod.id];
+                          return (
+                            <div
+                              key={mod.id}
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                                done
+                                  ? 'border-white/5 bg-white/[0.02]'
+                                  : 'border-white/5 bg-white/[0.03] hover:bg-white/[0.05]'
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
+                                  done ? 'bg-white/10 border-white/20' : 'border-white/20'
+                                }`}
+                              >
+                                {done && <CheckCircle2 size={12} className="text-white/60" />}
+                              </div>
+                              <span
+                                className={`flex-1 text-sm ${
+                                  done ? 'line-through text-muted-foreground/50' : 'text-muted-foreground'
+                                }`}
+                              >
+                                {mod.title}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {done && quizzes && quizzes.length > 0 && !quizPassed && (
+                                  <button
+                                    onClick={() => handleStartQuiz(mod.id, quizzes[0])}
+                                    className="text-xs text-foreground border border-white/20 rounded-lg px-3 py-1 hover:bg-white/10 transition-colors"
+                                  >
+                                    Quiz
+                                  </button>
+                                )}
+                                {quizPassed && (
+                                  <span className="text-xs text-green-400 font-medium">Quiz passed</span>
+                                )}
+                                {!done && (
+                                  <button
+                                    onClick={() => handleMarkDone(mod.id, mod.title)}
+                                    disabled={loading}
+                                    className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
+                                  >
+                                    {loading ? '...' : 'Mark done'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    }
+                  />
+                </div>
+
+                {/* QuizViewer sub-modal */}
+                {activeQuiz && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+                    onClick={() => setActiveQuiz(null)}
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-background border border-white/10 rounded-3xl w-full max-w-lg max-h-[80dvh] overflow-y-auto p-6 shadow-2xl custom-scrollbar"
+                    >
+                      <QuizViewer
+                        courseId={course.id}
+                        moduleId={activeQuiz.moduleId}
+                        quiz={activeQuiz.quiz}
+                        onQuizPassed={() => handleQuizPassed(activeQuiz.moduleId)}
+                        onClose={() => setActiveQuiz(null)}
+                      />
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-background/95 backdrop-blur-sm border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 mt-4 z-10">
+                  {!isEnrolled && !purchased && (
+                    <CheckoutButton courseId={course.id} amount={course.price} />
+                  )}
+                  {(isEnrolled || purchased) && (
                     <>
-                      <button 
-                        onClick={handleSaveCourse}
-                        className="w-full sm:w-auto px-8 py-3 bg-foreground text-background font-semibold rounded-full hover:scale-[1.02] transition-transform"
-                      >
-                        Enroll for ${course.price}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button 
-                        onClick={handleContinue}
-                        disabled={progressPercent === 100}
-                        className="w-full sm:w-auto px-8 py-3 bg-foreground text-background font-semibold rounded-full hover:scale-[1.02] transition-transform flex items-center gap-2 justify-center disabled:opacity-50"
-                      >
-                        <PlayCircle size={18} />
-                        {progressPercent === 100 ? 'Completed' : 'Continue Learning'}
-                      </button>
                       <span className="text-sm font-medium text-green-400 flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-4 py-2 rounded-full">
-                        <CheckCircle2 size={16} /> Enrolled
+                        <CheckCircle2 size={16} /> {isEnrolled ? 'Enrolled' : 'Purchased'}
                       </span>
                       {progressPercent === 100 && (
-                        <button 
+                        <button
                           onClick={handleDownloadCertificate}
                           className="w-full sm:w-auto px-6 py-3 border border-white/10 font-semibold rounded-full hover:bg-white/5 transition-colors flex items-center justify-center gap-2"
                         >

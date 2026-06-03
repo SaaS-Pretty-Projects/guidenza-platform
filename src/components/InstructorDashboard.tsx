@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, TrendingUp, TrendingDown, Star, Search, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, HelpCircle, TrendingUp, TrendingDown, Star, Search, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Helmet } from 'react-helmet-async';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
+import { QuizEditor } from './QuizEditor';
 
 interface Course {
   id: string;
@@ -80,6 +81,7 @@ export function InstructorDashboard() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
+  const [quizManagerCourse, setQuizManagerCourse] = useState<{ id: string; title: string; modules?: { id: string; title: string }[] } | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -238,6 +240,21 @@ export function InstructorDashboard() {
       toast.error('Failed to update courses');
     } finally {
       setIsBatchUpdating(false);
+    }
+  };
+
+  const handleOpenQuizManager = async (courseId: string) => {
+    try {
+      const snap = await getDoc(doc(db, 'courses', courseId));
+      if (snap.exists()) {
+        const data = snap.data();
+        setQuizManagerCourse({ id: courseId, title: data.title, modules: data.modules ?? [] });
+      } else {
+        toast.error('Course not found');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load course');
     }
   };
 
@@ -689,6 +706,13 @@ export function InstructorDashboard() {
                 </div>
                 <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
+                    onClick={() => handleOpenQuizManager(course.id)}
+                    className="w-10 h-10 bg-black/50 hover:bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10"
+                    title="Manage Quizzes"
+                  >
+                    <HelpCircle size={16} />
+                  </button>
+                  <button 
                     onClick={() => {
                       setAnnouncementCourse(course);
                       setIsAnnouncementModalOpen(true);
@@ -842,6 +866,14 @@ export function InstructorDashboard() {
       )}
 
       {/* Announcement Modal */}
+      {quizManagerCourse && (
+        <QuizEditor
+          courseId={quizManagerCourse.id}
+          modules={quizManagerCourse.modules ?? []}
+          onClose={() => setQuizManagerCourse(null)}
+        />
+      )}
+
       {isAnnouncementModalOpen && announcementCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-background border border-white/10 rounded-3xl w-full max-w-lg p-8 relative shadow-2xl">

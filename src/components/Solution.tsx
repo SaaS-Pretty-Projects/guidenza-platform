@@ -111,7 +111,7 @@ export function Solution() {
                 key={course.id}
                 {...fadeUp(i * 0.1)}
                 onClick={() => setSelectedCourse(course)}
-                className="p-6 md:p-8 rounded-3xl liquid-glass border border-white/5 cursor-pointer hover:bg-white-[0.03] transition-colors group relative"
+                className="p-6 md:p-8 rounded-3xl liquid-glass border border-white/5 cursor-pointer hover:bg-white/[0.03] transition-colors group relative"
               >
                 {isEnrolled && (
                   <div className="absolute top-4 right-4 bg-green-500/20 text-green-400 border border-green-500/30 text-xs px-3 py-1 rounded-full flex items-center gap-1">

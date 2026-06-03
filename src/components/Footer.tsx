@@ -45,7 +45,7 @@ export function Footer() {
           </div>
 
           {/* Right Column - Links */}
-          <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-8">
+          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {FOOTER_LINKS.map((col, i) => (
               <div key={i} className="flex flex-col gap-6">
                 <h4 className="text-xs uppercase tracking-[3px] text-muted-foreground">

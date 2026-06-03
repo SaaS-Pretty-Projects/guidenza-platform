@@ -95,7 +95,7 @@ export function InstructorProfile() {
             <div 
               key={course.id} 
               onClick={() => setSelectedCourse(course)}
-              className="liquid-glass rounded-3xl border border-white/5 overflow-hidden group cursor-pointer hover:bg-white-[0.03] transition-colors"
+              className="liquid-glass rounded-3xl border border-white/5 overflow-hidden group cursor-pointer hover:bg-white/[0.03] transition-colors"
             >
               <div className="h-48 bg-muted relative">
                 <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
