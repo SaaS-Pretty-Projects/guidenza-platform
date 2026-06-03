@@ -77,15 +77,17 @@ export async function getQuiz(
   quizId: string,
 ): Promise<Quiz | null> {
   const snap = await getDoc(quizDocPath(courseId, moduleId, quizId));
-  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Quiz) : null;
+  return snap.exists() ? ({ ...snap.data(), id: snap.id } as Quiz) : null;
 }
 
 export async function getModuleQuizzes(
   courseId: string,
   moduleId: string,
 ): Promise<Quiz[]> {
-  const snap = await getDocs(quizzesColPath(courseId, moduleId));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Quiz));
+  const snap = await getDocs(
+    query(quizzesColPath(courseId, moduleId), orderBy('title')),
+  );
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Quiz));
 }
 
 /**
@@ -112,16 +114,14 @@ export async function submitQuizAttempt(
     throw new Error('Maximum attempts reached');
   }
 
-  let correctCount = 0;
   const gradedAnswers: QuizAnswer[] = answers.map((a) => {
     const question = quiz.questions.find((q) => q.id === a.questionId);
     const correct = question ? question.correctAnswer === a.selectedAnswer : false;
-    if (correct) correctCount++;
     return { questionId: a.questionId, selectedAnswer: a.selectedAnswer, correct };
   });
 
-  const total = quiz.questions.length;
-  const score = total > 0 ? Math.round((correctCount / total) * 100) : 100;
+  const { correct, total } = computeQuizScore(gradedAnswers);
+  const score = total > 0 ? Math.round((correct / total) * 100) : 100;
   const passed = score >= quiz.passingScore;
 
   const attemptRef = await addDoc(attemptsRef, {
@@ -138,7 +138,6 @@ export async function submitQuizAttempt(
 
   return {
     attempt: {
-      id: attemptRef.id,
       courseId,
       moduleId,
       quizId,
@@ -146,6 +145,7 @@ export async function submitQuizAttempt(
       passed,
       answers: gradedAnswers,
       completedAt: null,
+      id: attemptRef.id,
     },
     canRetry,
   };
@@ -162,7 +162,7 @@ export async function getQuizAttempts(
       orderBy('completedAt', 'desc'),
     ),
   );
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as QuizAttempt));
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as QuizAttempt));
 }
 
 export async function hasPassedQuiz(
