@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { UserCircle, Award, Flame } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../contexts/AuthContext';
 import { useDashboard, CourseWithModules } from '../hooks/useDashboard';
 import { relativeTime } from '../lib/relativeTime';
 import { getWeekDots } from '../lib/learningData';
@@ -63,6 +64,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen pt-32 pb-24 px-6 max-w-5xl mx-auto">
+      <Helmet><title>Dashboard | Guidenza</title></Helmet>
       {/* Page header */}
       <motion.div {...fadeUp(0)} className="mb-10">
         <div className="text-xs uppercase tracking-[3px] text-muted-foreground mb-3">
