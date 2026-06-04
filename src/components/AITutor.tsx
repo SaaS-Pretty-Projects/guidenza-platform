@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { X, Send, Bot, User, Loader2 } from 'lucide-react';
 import { askTutor } from '../lib/ai';
 
 export interface TutorMessage {
+  id: string;
   role: 'user' | 'tutor';
   content: string;
 }
@@ -15,11 +16,18 @@ interface AITutorProps {
   onClose: () => void;
 }
 
+let msgId = 0;
+
 export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onClose }: AITutorProps) {
   const [messages, setMessages] = useState<TutorMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,23 +44,25 @@ export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onCl
     if (!question || loading) return;
     setInput('');
 
-    const userMsg: TutorMessage = { role: 'user', content: question };
+    const userMsg: TutorMessage = { id: `m-${++msgId}`, role: 'user', content: question };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
     try {
       const answer = await askTutor(courseId, moduleId, question);
-      const tutorMsg: TutorMessage = { role: 'tutor', content: answer };
+      if (!mountedRef.current) return;
+      const tutorMsg: TutorMessage = { id: `m-${++msgId}`, role: 'tutor', content: answer };
       setMessages((prev) => [...prev, tutorMsg]);
-    } catch (err) {
-      const errMsg: TutorMessage = { role: 'tutor', content: 'Sorry, I encountered an error. Please try again.' };
+    } catch {
+      if (!mountedRef.current) return;
+      const errMsg: TutorMessage = { id: `m-${++msgId}`, role: 'tutor', content: 'Sorry, I encountered an error. Please try again.' };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -66,12 +76,12 @@ export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onCl
           <h4 className="text-sm font-semibold">AI Tutor</h4>
           <p className="text-xs text-muted-foreground">{moduleTitle}</p>
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={onClose} aria-label="Close AI tutor" className="text-muted-foreground hover:text-foreground transition-colors">
           <X size={18} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3 mb-3 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-3 mb-3 custom-scrollbar" aria-live="polite">
         {messages.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <Bot size={32} className="mx-auto mb-2 opacity-50" />
@@ -79,8 +89,8 @@ export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onCl
             <p className="text-xs mt-1">I'll use the module content to answer.</p>
           </div>
         )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'tutor' && (
               <div className="w-7 h-7 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 mt-1">
                 <Bot size={14} className="text-purple-400" />
