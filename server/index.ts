@@ -3,6 +3,7 @@ import cors from 'cors';
 import admin from 'firebase-admin';
 import { db } from './firebase.js';
 import { createTransaction, handleWebhook } from './safePay.js';
+import { generateAQuiz, askTutor, generateSummary, getModuleContent } from './ai.js';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
@@ -67,6 +68,57 @@ app.get('/api/orders/:userId', async (req, res) => {
   } catch (err) {
     console.error('Orders fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// ── AI Routes ───────────────────────────────────────────────────────────────
+
+app.post('/api/ai/generate-quiz', async (req, res) => {
+  try {
+    const { courseId, moduleId, difficulty, questionCount } = req.body;
+    if (!courseId || !moduleId) {
+      res.status(400).json({ error: 'Missing courseId or moduleId' });
+      return;
+    }
+    const mod = await getModuleContent(courseId, moduleId);
+    const quiz = await generateAQuiz({
+      moduleTitle: mod.title,
+      moduleContent: mod.content,
+      difficulty: difficulty ?? 'medium',
+      questionCount: questionCount ?? 5,
+    });
+    res.json(quiz);
+  } catch (err) {
+    console.error('AI quiz generation error:', err);
+    res.status(500).json({ error: 'Failed to generate quiz' });
+  }
+});
+
+app.post('/api/ai/tutor', async (req, res) => {
+  try {
+    const { courseId, moduleId, question } = req.body;
+    if (!courseId || !moduleId || !question) {
+      res.status(400).json({ error: 'Missing courseId, moduleId, or question' });
+      return;
+    }
+    const mod = await getModuleContent(courseId, moduleId);
+    const answer = await askTutor(mod.title, mod.content, question);
+    res.json({ answer });
+  } catch (err) {
+    console.error('AI tutor error:', err);
+    res.status(500).json({ error: 'Failed to get tutor response' });
+  }
+});
+
+app.get('/api/ai/summarize/:courseId/:moduleId', async (req, res) => {
+  try {
+    const { courseId, moduleId } = req.params;
+    const mod = await getModuleContent(courseId, moduleId);
+    const summary = await generateSummary(mod.title, mod.content);
+    res.json({ summary, moduleTitle: mod.title });
+  } catch (err) {
+    console.error('AI summary error:', err);
+    res.status(500).json({ error: 'Failed to generate summary' });
   }
 });
 
