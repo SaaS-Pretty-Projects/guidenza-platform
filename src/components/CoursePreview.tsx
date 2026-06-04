@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PlayCircle, CheckCircle2, Heart, Star, Download } from 'lucide-react';
+import { X, PlayCircle, CheckCircle2, Heart, Star, Download, Sparkles } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
@@ -12,6 +12,7 @@ import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleCompl
 import { CheckoutButton } from './CheckoutButton';
 import { PurchaseGate } from './PurchaseGate';
 import { hasPurchasedCourse } from '../lib/orders';
+import { AITutor } from './AITutor';
 
 interface Course {
   id: string;
@@ -52,6 +53,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
   const [markingDone, setMarkingDone] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
+  const [tutorOpen, setTutorOpen] = useState<{ moduleId: string; question?: string } | null>(null);
 
   useEffect(() => {
     if (user && course) {
@@ -412,15 +414,25 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                               >
                                 {mod.title}
                               </span>
-                              {!done && (
+                              <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => handleMarkDone(mod.id, mod.title)}
-                                  disabled={loading}
-                                  className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
+                                  onClick={() => setTutorOpen({ moduleId: mod.id })}
+                                  className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-2 py-1 hover:text-purple-400 hover:border-purple-500/30 transition-colors flex items-center gap-1"
+                                  title="I'm stuck - get AI help"
                                 >
-                                  {loading ? '...' : 'Mark done'}
+                                  <Sparkles size={10} />
+                                  Stuck
                                 </button>
-                              )}
+                                {!done && (
+                                  <button
+                                    onClick={() => handleMarkDone(mod.id, mod.title)}
+                                    disabled={loading}
+                                    className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors disabled:opacity-30"
+                                  >
+                                    {loading ? '...' : 'Mark done'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -527,6 +539,22 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                     )}
                   </div>
                 </div>
+
+                {tutorOpen && (
+                  <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-background border border-white/10 rounded-2xl w-full max-w-lg">
+                      <div className="p-4">
+                        <AITutor
+                          courseId={course.id}
+                          moduleId={tutorOpen.moduleId}
+                          moduleTitle={moduleList.find(m => m.id === tutorOpen.moduleId)?.title ?? ''}
+                          initialQuestion={tutorOpen.question}
+                          onClose={() => setTutorOpen(null)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
