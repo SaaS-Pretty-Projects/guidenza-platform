@@ -1,6 +1,6 @@
 import { auth } from './firebase';
 
-const AI_API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api/ai';
+const AI_API_BASE = `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'}/ai`;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const token = await auth.currentUser?.getIdToken();

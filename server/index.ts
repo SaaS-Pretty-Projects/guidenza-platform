@@ -40,6 +40,12 @@ async function requireCourseAccess(auth, courseId) {
     const data = courseDoc.data();
     if (data?.instructorId === auth.uid) return true;
   }
+  // Fallback: check Firestore user doc (covers free-course enrollees whose claims aren't set)
+  const userDoc = await db.collection('users').doc(auth.uid).get();
+  if (userDoc.exists) {
+    const userData = userDoc.data();
+    if ((userData?.purchasedCourses || []).includes(courseId) || (userData?.enrolledCourses || []).includes(courseId)) return true;
+  }
   return false;
 }
 
