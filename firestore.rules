@@ -42,16 +42,19 @@ service cloud.firestore {
         allow create, update, delete: if isSignedIn()
           && get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
       }
+
       match /modules/{moduleId}/quizzes/{quizId} {
+        // Read: preview quizzes are public; enrolled/purchased courses checked via auth token claims (no get() calls)
         allow read: if resource.data.preview == true
           || (
             request.auth != null
             && (
               get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid
-              || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
-              || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enrolledCourses', [])
+              || courseId in request.auth.token.purchasedCourses
+              || courseId in request.auth.token.enrolledCourses
             )
           );
+        // Write: only course author
         allow create, update, delete: if request.auth != null
           && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
       }

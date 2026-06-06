@@ -7,6 +7,25 @@ if (!GEMINI_API_KEY) {
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
+// Input sanitization for prompt injection prevention
+function sanitizeForPrompt(input: string, maxLen = 50000): string {
+  if (!input) return '';
+  let s = String(input).slice(0, maxLen);
+  // Escape backticks and quotes that could break prompt structure
+  s = s.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  // Limit newlines to prevent prompt stuffing
+  s = s.replace(/\n{3,}/g, '\n\n');
+  return s;
+}
+
+function sanitizeQuestion(input: string, maxLen = 2000): string {
+  if (!input) return '';
+  let s = String(input).slice(0, maxLen);
+  s = s.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  s = s.replace(/["']/g, '');
+  return s;
+}
+
 interface GenerateQuizParams {
   moduleTitle: string;
   moduleContent: string;
@@ -33,9 +52,12 @@ function buildQuizPrompt(params: GenerateQuizParams): string {
     hard: 'Questions should test analysis and synthesis. Each question has 4 answer options. Include scenario-based and multi-concept questions.',
   };
 
-  return `You are a course quiz generator. Generate a quiz for a module titled "${params.moduleTitle}" based on the following content:
+  const safeTitle = sanitizeForPrompt(params.moduleTitle, 200);
+  const safeContent = sanitizeForPrompt(params.moduleContent, 30000);
 
-${params.moduleContent}
+  return `You are a course quiz generator. Generate a quiz for a module titled "${safeTitle}" based on the following content:
+
+${safeContent}
 
 Difficulty: ${params.difficulty}
 ${difficultyGuide[params.difficulty]}
@@ -43,7 +65,7 @@ Number of questions: ${params.questionCount}
 
 Return ONLY valid JSON with this exact structure (no markdown, no backticks):
 {
-  "title": "Quiz: ${params.moduleTitle}",
+  "title": "Quiz: ${safeTitle}",
   "passingScore": 70,
   "questions": [
     {
@@ -58,23 +80,30 @@ The correctAnswer is the 0-based index of the correct option. Make sure the corr
 }
 
 function buildTutorPrompt(moduleTitle: string, moduleContent: string, question: string): string {
-  return `You are a helpful course tutor for a module titled "${moduleTitle}". 
+  const safeTitle = sanitizeForPrompt(moduleTitle, 200);
+  const safeContent = sanitizeForPrompt(moduleContent, 30000);
+  const safeQuestion = sanitizeQuestion(question, 2000);
+
+  return `You are a helpful course tutor for a module titled "${safeTitle}".
 
 Here is the module content you are tutoring about:
 ---
-${moduleContent}
+${safeContent}
 ---
 
-The student asks: "${question}"
+The student asks: "${safeQuestion}"
 
 Provide a helpful, clear explanation referencing the module content. If the question is outside the module scope, politely guide them back. Keep your answer concise (under 3 paragraphs).`;
 }
 
 function buildSummaryPrompt(moduleTitle: string, moduleContent: string): string {
-  return `Summarize the following module titled "${moduleTitle}" in 3-5 bullet points. Each bullet should be a key takeaway. Return ONLY a JSON array of strings.
+  const safeTitle = sanitizeForPrompt(moduleTitle, 200);
+  const safeContent = sanitizeForPrompt(moduleContent, 30000);
+
+  return `Summarize the following module titled "${safeTitle}" in 3-5 bullet points. Each bullet should be a key takeaway. Return ONLY a JSON array of strings.
 
 Module content:
-${moduleContent}`;
+${safeContent}`;
 }
 
 async function callGemini(prompt: string): Promise<string> {

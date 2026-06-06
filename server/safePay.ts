@@ -43,6 +43,24 @@ export async function createTransaction(
   };
 }
 
+/** Helper: update user's custom claims with purchased/enrolled courses */
+async function updateUserCourseClaims(userId: string, courseId: string): Promise<void> {
+  try {
+    // Get current user record to read existing claims
+    const userRecord = await admin.auth().getUser(userId);
+    const currentClaims = userRecord.customClaims || {};
+    const purchased = Array.from(new Set([...(currentClaims.purchasedCourses || []), courseId]));
+    const enrolled = Array.from(new Set([...(currentClaims.enrolledCourses || []), courseId]));
+    await admin.auth().setCustomUserClaims(userId, {
+      ...currentClaims,
+      purchasedCourses: purchased,
+      enrolledCourses: enrolled,
+    });
+  } catch (err) {
+    console.error(`Failed to update custom claims for user ${userId}:`, err);
+  }
+}
+
 /**
  * Verifies the webhook signature and updates the order + user access.
  */
@@ -78,7 +96,7 @@ export async function handleWebhook(
   // Update order to confirmed
   await orderDoc.ref.update({ status: 'confirmed' });
 
-  // Add course to user's purchasedCourses
+  // Add course to user's purchasedCourses (Firestore)
   await db.collection('users').doc(order.userId).set(
     {
       purchasedCourses: admin.firestore.FieldValue.arrayUnion(order.courseId),
@@ -86,13 +104,16 @@ export async function handleWebhook(
     { merge: true },
   );
 
-  // Also enroll them
+  // Also enroll them (Firestore)
   await db.collection('users').doc(order.userId).set(
     {
       enrolledCourses: admin.firestore.FieldValue.arrayUnion(order.courseId),
     },
     { merge: true },
   );
+
+  // Update Auth custom claims for Firestore rules optimization (no get() calls)
+  await updateUserCourseClaims(order.userId, order.courseId);
 
   // Log activity event
   await db.collection('users').doc(order.userId).collection('activity').add({
