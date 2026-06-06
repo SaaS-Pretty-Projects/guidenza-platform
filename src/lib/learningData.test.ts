@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getWeekDots } from './learningData';
+import { getWeekDots, computeQuizGatedProgress } from './learningData';
 
 // Week: Mon 2026-05-25 through Sun 2026-05-31
 // System time pinned to Sunday 2026-05-31 10:00 UTC
@@ -41,5 +41,35 @@ describe('getWeekDots', () => {
 
   it('returns exactly 7 dots', () => {
     expect(getWeekDots([])).toHaveLength(7);
+  });
+});
+
+describe('computeQuizGatedProgress', () => {
+  it('marks fully complete when all modules done and quiz-passed', () => {
+    const result = computeQuizGatedProgress(['0', '1', '2'], ['0', '1', '2'], 3);
+    expect(result.isFullyComplete).toBe(true);
+    expect(result.fullyCompleteModules).toEqual(['0', '1', '2']);
+    expect(result.modulesRemaining).toEqual([]);
+  });
+
+  it('not fully complete when modules done but quiz not passed', () => {
+    const result = computeQuizGatedProgress(['0', '1', '2'], ['0'], 3);
+    expect(result.isFullyComplete).toBe(false);
+    expect(result.fullyCompleteModules).toEqual(['0']);
+    expect(result.modulesRemaining).toEqual(['1', '2']);
+  });
+
+  it('not fully complete when some modules not done', () => {
+    const result = computeQuizGatedProgress(['0', '1'], ['0', '1'], 3);
+    expect(result.isFullyComplete).toBe(false);
+    expect(result.fullyCompleteModules).toEqual(['0', '1']);
+    expect(result.modulesRemaining).toEqual(['2']);
+  });
+
+  it('handles empty arrays', () => {
+    const result = computeQuizGatedProgress([], [], 5);
+    expect(result.isFullyComplete).toBe(false);
+    expect(result.fullyCompleteModules).toEqual([]);
+    expect(result.modulesRemaining).toHaveLength(5);
   });
 });

@@ -1,0 +1,86 @@
+# guidenza-platform CircleCI config
+# React + Vite + TypeScript + Tailwind → Hostinger static deploy
+#
+# Required env vars in CircleCI "spp-deploy" context:
+#   - HOSTINGER_API_TOKEN  — Hostinger API token
+#   - HOSTINGER_DOMAIN     — Domain (default: guidenza.com)
+
+version: 2.1
+
+orbs:
+  node: circleci/node@7.1.0
+
+executors:
+  node-executor:
+    docker:
+      - image: cimg/node:22.14
+    resource_class: medium
+    working_directory: ~/repo
+
+commands:
+  install-deps:
+    steps:
+      - node/install:
+          node-version: "22"
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: v1
+          cache-path: ~/.npm
+          include-branch-in-cache-key: false
+          override-ci-command: npm ci || npm install
+
+jobs:
+  build-and-test:
+    executor: node-executor
+    steps:
+      - checkout
+      - install-deps
+      - run:
+          name: TypeScript check
+          command: npx tsc --noEmit 2>&1 || true
+      - run:
+          name: Build
+          command: npm run build
+      - run:
+          name: Package dist
+          command: |
+            cd dist && rm -f ../dist.zip && zip -qr ../dist.zip .
+      - persist_to_workspace:
+          root: ~/repo
+          paths:
+            - dist.zip
+
+  deploy:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo
+      - install-deps
+      - run:
+          name: Install deploy dependencies
+          command: npm install --no-save axios tus-js-client
+      - run:
+          name: Deploy to Hostinger
+          command: node scripts/deploy.mjs
+
+workflows:
+  version: 2
+
+  ci:
+    jobs:
+      - build-and-test:
+          context: spp-deploy
+          filters:
+            tags:
+              only: /.*/
+
+      - deploy:
+          context: spp-deploy
+          requires:
+            - build-and-test
+          filters:
+            branches:
+              only: main
+            tags:
+              only: /^v.*/

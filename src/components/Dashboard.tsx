@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { UserCircle, Award, Flame } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../contexts/AuthContext';
 import { useDashboard, CourseWithModules } from '../hooks/useDashboard';
 import { relativeTime } from '../lib/relativeTime';
 import { getWeekDots } from '../lib/learningData';
+import { generateCertificatePdf } from '../lib/certificate';
 import { fadeUp } from '../lib/animations';
 import { CoursePreview } from './CoursePreview';
 import { OrderHistory } from './OrderHistory';
@@ -62,6 +64,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen pt-32 pb-24 px-6 max-w-5xl mx-auto">
+      <Helmet><title>Dashboard | Guidenza</title></Helmet>
       {/* Page header */}
       <motion.div {...fadeUp(0)} className="mb-10">
         <div className="text-xs uppercase tracking-[3px] text-muted-foreground mb-3">
@@ -201,7 +204,7 @@ export function Dashboard() {
                     </p>
                   </div>
                   <button
-                    onClick={() => toast('PDF certificates coming soon')}
+                    onClick={() => generateCertificatePdf(user?.displayName ?? 'Student', cert.courseName, cert.issuedAt?.toDate())}
                     className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-3 py-1 hover:text-foreground hover:border-white/20 transition-colors flex-shrink-0"
                   >
                     Download

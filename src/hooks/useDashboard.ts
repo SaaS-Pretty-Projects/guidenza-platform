@@ -93,6 +93,7 @@ export function useDashboard(): DashboardData {
             ? (progressSnap.data() as CourseProgress)
             : {
                 completedModules: [],
+                quizPassedModules: [],
                 totalModules: totalMods,
                 lastModuleId: '',
                 updatedAt: null,

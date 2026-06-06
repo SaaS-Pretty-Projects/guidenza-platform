@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
-import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, TrendingUp, TrendingDown, Star, Search, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { Plus, Edit2, Users, DollarSign, BookOpen, Info, MessageSquare, HelpCircle, TrendingUp, TrendingDown, Star, Search, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Helmet } from 'react-helmet-async';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
+import { QuizEditor } from './QuizEditor';
 
 interface Course {
   id: string;
@@ -80,6 +81,7 @@ export function InstructorDashboard() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
+  const [quizManagerCourse, setQuizManagerCourse] = useState<{ id: string; title: string; modules?: { id: string; title: string }[] } | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -141,6 +143,7 @@ export function InstructorDashboard() {
       title: formData.title,
       description: formData.description,
       author: user.displayName || 'Anonymous',
+      instructorId: user.uid,
       price: Number(formData.price),
       thumbnail: formData.thumbnail,
       categories: categoriesArray,
@@ -237,6 +240,21 @@ export function InstructorDashboard() {
       toast.error('Failed to update courses');
     } finally {
       setIsBatchUpdating(false);
+    }
+  };
+
+  const handleOpenQuizManager = async (courseId: string) => {
+    try {
+      const snap = await getDoc(doc(db, 'courses', courseId));
+      if (snap.exists()) {
+        const data = snap.data();
+        setQuizManagerCourse({ id: courseId, title: data.title, modules: data.modules ?? [] });
+      } else {
+        toast.error('Course not found');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load course');
     }
   };
 
@@ -688,6 +706,13 @@ export function InstructorDashboard() {
                 </div>
                 <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
+                    onClick={() => handleOpenQuizManager(course.id)}
+                    className="w-10 h-10 bg-black/50 hover:bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10"
+                    title="Manage Quizzes"
+                  >
+                    <HelpCircle size={16} />
+                  </button>
+                  <button 
                     onClick={() => {
                       setAnnouncementCourse(course);
                       setIsAnnouncementModalOpen(true);
@@ -720,6 +745,33 @@ export function InstructorDashboard() {
           ))}
         </div>
       )}
+
+      {/* Earnings & Revenue Share */}
+      <div className="mb-12 liquid-glass p-6 rounded-3xl border border-white/5">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Earnings & Payouts</h2>
+            <p className="text-sm text-muted-foreground mt-1">70/30 revenue share &bull; You keep 70% of every enrollment</p>
+          </div>
+          <button className="px-5 py-2.5 rounded-full bg-green-500/10 text-green-400 font-medium text-sm hover:bg-green-500/20 transition">
+            Request Withdrawal
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-white/3 border border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Total Earned (70%)</p>
+            <p className="text-2xl font-semibold text-green-400">${Math.round(totalRevenue * 0.7).toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-white/3 border border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Available for Withdrawal</p>
+            <p className="text-2xl font-semibold">${Math.round(totalRevenue * 0.7 * 0.8).toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-white/3 border border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Pending (Processing)</p>
+            <p className="text-2xl font-semibold text-yellow-400">${Math.round(totalRevenue * 0.7 * 0.2).toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
 
       {/* Edit/Create Modal */}
       {isModalOpen && (
@@ -814,6 +866,14 @@ export function InstructorDashboard() {
       )}
 
       {/* Announcement Modal */}
+      {quizManagerCourse && (
+        <QuizEditor
+          courseId={quizManagerCourse.id}
+          modules={quizManagerCourse.modules ?? []}
+          onClose={() => setQuizManagerCourse(null)}
+        />
+      )}
+
       {isAnnouncementModalOpen && announcementCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-background border border-white/10 rounded-3xl w-full max-w-lg p-8 relative shadow-2xl">

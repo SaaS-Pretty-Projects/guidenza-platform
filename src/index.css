@@ -89,6 +89,20 @@
 
 .font-serif { font-family: "Instrument Serif", ui-serif, Georgia, serif; }
 
+/* Lenis smooth scroll */
+html.lenis, html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
 /* Liquid glass effect — frosted surface with inset highlight + animated gradient border */
 .liquid-glass {
   background: rgba(255, 255, 255, 0.01);
@@ -105,12 +119,46 @@
   position: absolute; inset: 0;
   border-radius: inherit;
   padding: 1.4px;
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
-    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
-    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+  background: conic-gradient(from var(--glass-angle, 0deg),
+    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.08) 25%,
+    rgba(255,255,255,0) 50%, rgba(255,255,255,0.08) 75%,
+    rgba(255,255,255,0.45) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+  animation: glass-rotate 8s linear infinite;
+}
+
+@property --glass-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glass-rotate {
+  to { --glass-angle: 360deg; }
+}
+
+/* Shimmer skeleton animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-pulse {
+  animation: shimmer 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+}
+
+/* Magnetic button translate via CSS custom props — composes with framer-motion scale */
+.magnetic-target {
+  translate: var(--magnetic-x, 0px) var(--magnetic-y, 0px);
+  transition: translate 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reduced motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass::before { animation: none; }
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

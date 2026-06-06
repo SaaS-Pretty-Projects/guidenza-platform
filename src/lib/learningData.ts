@@ -15,9 +15,19 @@ export interface CourseModule {
 
 export interface CourseProgress {
   completedModules: string[];
+  quizPassedModules: string[];
   totalModules: number;
   lastModuleId: string;
   updatedAt: Timestamp | null;
+}
+
+export interface QuizGatedProgress {
+  completedModules: string[];
+  quizPassedModules: string[];
+  fullyCompleteModules: string[];
+  totalModules: number;
+  isFullyComplete: boolean;
+  modulesRemaining: string[];
 }
 
 export interface ActivityEvent {
@@ -76,6 +86,28 @@ export function getWeekDots(
   });
 }
 
+/**
+ * Computes quiz-gated progress from the raw progress data.
+ * A module is "fully complete" when it's in both completedModules and quizPassedModules.
+ */
+export function computeQuizGatedProgress(
+  completedModules: string[],
+  quizPassedModules: string[],
+  totalModules: number,
+): QuizGatedProgress {
+  const fullyCompleteModules = completedModules.filter((m) => quizPassedModules.includes(m));
+  return {
+    completedModules,
+    quizPassedModules,
+    fullyCompleteModules,
+    totalModules,
+    isFullyComplete: fullyCompleteModules.length >= totalModules,
+    modulesRemaining: Array.from({ length: totalModules }, (_, i) => i).filter(
+      (i) => !fullyCompleteModules.includes(String(i)),
+    ).map(String),
+  };
+}
+
 // ── Firestore write helpers ────────────────────────────────────────────────
 
 /**
@@ -122,7 +154,7 @@ export async function markModuleComplete(
   const progressSnap = await getDoc(progressRef);
   const existing: CourseProgress = progressSnap.exists()
     ? (progressSnap.data() as CourseProgress)
-    : { completedModules: [], totalModules, lastModuleId: '', updatedAt: null };
+    : { completedModules: [], quizPassedModules: [], totalModules, lastModuleId: '', updatedAt: null };
 
   if (existing.completedModules.includes(moduleId)) {
     return { certificateEarned: false };
@@ -165,7 +197,79 @@ export async function markModuleComplete(
   });
 
   const newCount = existing.completedModules.length + 1;
-  if (newCount >= totalModules) {
+  const quizPassed = existing.quizPassedModules ?? [];
+  const gated = computeQuizGatedProgress(
+    [...existing.completedModules, moduleId],
+    quizPassed,
+    totalModules,
+  );
+  if (gated.isFullyComplete) {
+    await setDoc(doc(db, 'users', uid, 'certificates', courseId), {
+      courseName,
+      issuedAt: serverTimestamp(),
+    });
+    await addDoc(collection(db, 'users', uid, 'activity'), {
+      type: 'certificate_earned',
+      courseId,
+      courseName,
+      createdAt: serverTimestamp(),
+    });
+    return { certificateEarned: true };
+  }
+
+  return { certificateEarned: false };
+}
+
+/**
+ * Called when a user passes a module's quiz.
+ * Adds the module to quizPassedModules. If it's the last module and all are
+ * both completed AND quiz-passed, issues a certificate.
+ */
+export async function markQuizPassed(
+  uid: string,
+  courseId: string,
+  moduleId: string,
+  courseName: string,
+): Promise<{ certificateEarned: boolean }> {
+  const progressRef = doc(db, 'users', uid, 'progress', courseId);
+  const progressSnap = await getDoc(progressRef);
+  const existing: CourseProgress | null = progressSnap.exists()
+    ? (progressSnap.data() as CourseProgress)
+    : null;
+
+  if (!existing) {
+    await setDoc(progressRef, {
+      completedModules: [],
+      quizPassedModules: [moduleId],
+      totalModules: 1,
+      lastModuleId: moduleId,
+      updatedAt: serverTimestamp(),
+    });
+    return { certificateEarned: false };
+  }
+
+  const currentQuizPassed = existing.quizPassedModules ?? [];
+  if (currentQuizPassed.includes(moduleId)) {
+    return { certificateEarned: false };
+  }
+
+  await setDoc(
+    progressRef,
+    {
+      quizPassedModules: arrayUnion(moduleId),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  const newQuizPassed = [...currentQuizPassed, moduleId];
+  const gated = computeQuizGatedProgress(
+    existing.completedModules,
+    newQuizPassed,
+    existing.totalModules,
+  );
+
+  if (gated.isFullyComplete) {
     await setDoc(doc(db, 'users', uid, 'certificates', courseId), {
       courseName,
       issuedAt: serverTimestamp(),

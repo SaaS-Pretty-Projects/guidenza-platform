@@ -15,7 +15,8 @@ function Word({
   children: React.ReactNode; 
   progress: MotionValue<number>; 
   range: [number, number]; 
-  isHighlight: boolean; 
+  isHighlight: boolean;
+  key?: React.Key;
 }) {
   const opacity = useTransform(progress, range, [0.2, 1]);
   const blurRaw = useTransform(progress, range, [6, 0]);
@@ -51,7 +52,7 @@ export function Mission() {
 
   return (
     <section ref={containerRef} className="relative w-full">
-      <div className="h-[130vh] md:h-[150vh] overflow-hidden relative">
+      <div className="h-[110vh] sm:h-[130vh] md:h-[150vh] overflow-hidden relative">
         {/* Background parralax video */}
         <motion.div 
           style={{ y, scale }}
@@ -74,7 +75,7 @@ export function Mission() {
         <div className="absolute bottom-0 w-full h-40 bg-gradient-to-t from-background to-transparent z-[2]" />
 
         {/* Sticky Content */}
-        <div className="sticky top-0 h-screen flex flex-col items-center justify-end pb-16 md:pb-24 px-6 md:px-8 z-[3] max-w-5xl mx-auto text-center">
+        <div className="sticky top-0 h-screen flex flex-col items-center justify-end pb-12 sm:pb-16 md:pb-24 px-4 sm:px-6 md:px-8 z-[3] max-w-5xl mx-auto text-center">
           <div className="flex items-center gap-4 mb-8">
             <div className="h-px w-8 bg-border" />
             <span className="text-xs uppercase tracking-[3px] text-muted-foreground">
@@ -83,8 +84,8 @@ export function Mission() {
             <div className="h-px w-8 bg-border" />
           </div>
 
-          <div className="flex flex-col gap-8 md:gap-12">
-            <p className="text-2xl md:text-4xl lg:text-6xl font-medium tracking-[-1.5px] leading-[1.12]">
+          <div className="flex flex-col gap-6 sm:gap-8 md:gap-12">
+            <p className="text-xl sm:text-2xl md:text-4xl lg:text-6xl font-medium tracking-[-0.5px] sm:tracking-[-1px] md:tracking-[-1.5px] leading-[1.15] md:leading-[1.12]">
               {PARAGRAPH_1.map((word, i) => {
                 const start = i / totalWords;
                 const end = start + (1 / totalWords);
@@ -97,7 +98,7 @@ export function Mission() {
               })}
             </p>
 
-            <p className="text-xl md:text-2xl lg:text-3xl max-w-3xl mx-auto">
+            <p className="text-base sm:text-xl md:text-2xl lg:text-3xl max-w-3xl mx-auto">
               {PARAGRAPH_2.map((word, i) => {
                 const index = i + PARAGRAPH_1.length;
                 const start = index / totalWords;
@@ -111,7 +112,7 @@ export function Mission() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 mt-16 text-xs uppercase tracking-[3px] text-muted-foreground">
+          <div className="flex items-center gap-3 sm:gap-4 mt-10 sm:mt-16 text-[10px] sm:text-xs uppercase tracking-[2px] sm:tracking-[3px] text-muted-foreground">
             <span>Courses</span>
             <span className="w-1 h-1 rounded-full bg-border/60" />
             <span>Experts</span>

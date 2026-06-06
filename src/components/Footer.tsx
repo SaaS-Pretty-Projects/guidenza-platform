@@ -21,9 +21,9 @@ const FOOTER_LINKS = [
 export function Footer() {
   return (
     <footer className="relative border-t border-border/30 overflow-hidden bg-background">
-      <div className="px-6 md:px-8 max-w-7xl mx-auto pt-20 pb-12 relative z-10">
+      <div className="px-4 sm:px-6 md:px-8 max-w-7xl mx-auto pt-14 sm:pt-20 pb-10 sm:pb-12 relative z-10">
         {/* Top Block */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 pb-16 border-b border-border/30">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-12 lg:gap-8 pb-12 sm:pb-16 border-b border-border/30">
           {/* Left Column */}
           <div className="lg:col-span-5 flex flex-col gap-8">
             <Logo />
@@ -83,7 +83,7 @@ export function Footer() {
         className="absolute bottom-0 left-0 right-0 pointer-events-none select-none text-center overflow-hidden flex justify-center -mb-[4vw]"
         aria-hidden="true"
       >
-        <span className="text-[18vw] leading-none font-serif italic text-foreground/[0.04] tracking-[-0.02em]">
+        <span className="text-[22vw] sm:text-[18vw] leading-none font-serif italic text-foreground/[0.04] tracking-[-0.02em]">
           guidenza
         </span>
       </div>
