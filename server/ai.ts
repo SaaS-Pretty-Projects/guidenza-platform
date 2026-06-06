@@ -203,6 +203,9 @@ export async function generateAQuiz(params: GenerateQuizParams): Promise<Generat
     if (typeof question.questionText !== 'string' || !Array.isArray(question.options) || typeof question.correctAnswer !== 'number') {
       throw new Error('Invalid question structure in quiz response');
     }
+    if ((question.options as unknown[]).length === 0 || question.correctAnswer < 0 || question.correctAnswer >= (question.options as unknown[]).length) {
+      throw new Error(`Invalid correctAnswer index ${question.correctAnswer} for ${(question.options as unknown[]).length} options`);
+    }
   }
 
   return parsed as GenerateQuizResult;

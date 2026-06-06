@@ -248,7 +248,12 @@ export function InstructorDashboard() {
       const snap = await getDoc(doc(db, 'courses', courseId));
       if (snap.exists()) {
         const data = snap.data();
-        setQuizManagerCourse({ id: courseId, title: data.title, modules: data.modules ?? [] });
+        const modules = data.modules ?? [];
+        if (modules.length === 0) {
+          toast.error('This course has no modules. Add modules before creating quizzes.');
+          return;
+        }
+        setQuizManagerCourse({ id: courseId, title: data.title, modules });
       } else {
         toast.error('Course not found');
       }
