@@ -94,8 +94,8 @@ describe('deleteQuiz', () => {
     await deleteQuiz('c1', 'm1', 'q1');
 
     expect(deleteDoc).toHaveBeenCalledTimes(1);
-    expect(doc).toHaveBeenCalledWith(
-      expect.anything(), 'courses', 'c1', 'modules', 'm1', 'quizzes', 'q1',
-    );
+    const docCalls = vi.mocked(doc).mock.calls;
+    const lastCall = docCalls[docCalls.length - 1];
+    expect(lastCall.slice(1)).toEqual(['courses', 'c1', 'modules', 'm1', 'quizzes', 'q1']);
   });
 });
