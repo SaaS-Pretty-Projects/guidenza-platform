@@ -866,10 +866,11 @@ export function InstructorDashboard() {
       )}
 
       {/* Announcement Modal */}
-      {quizManagerCourse && (
+      {quizManagerCourse && (quizManagerCourse.modules ?? []).length > 0 && (
         <QuizEditor
           courseId={quizManagerCourse.id}
-          modules={quizManagerCourse.modules ?? []}
+          moduleId={(quizManagerCourse.modules ?? [])[0].id}
+          moduleTitle={(quizManagerCourse.modules ?? [])[0].title}
           onClose={() => setQuizManagerCourse(null)}
         />
       )}

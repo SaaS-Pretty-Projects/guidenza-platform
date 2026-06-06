@@ -237,12 +237,14 @@ export function CoursePlayer({ courseId, courseTitle, courseDescription, totalMo
         </div>
       </div>
 
-      <AITutor
-        courseTitle={courseTitle}
-        courseDescription={courseDescription}
-        isOpen={showTutor}
-        onClose={() => setShowTutor(false)}
-      />
+      {showTutor && (
+        <AITutor
+          courseId={courseId}
+          moduleId="general"
+          moduleTitle={courseTitle}
+          onClose={() => setShowTutor(false)}
+        />
+      )}
     </div>
   );
 }
