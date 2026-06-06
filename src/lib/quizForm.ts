@@ -1,5 +1,10 @@
 import type { GeneratedQuiz } from './ai';
 
+const generateId = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).substring(2, 15);
+
 export interface QuizFormQuestion {
   id: string;
   questionText: string;
@@ -20,6 +25,8 @@ export interface ValidationResult {
 export interface ValidationInput {
   title: string;
   questions: { questionText: string; options: string[]; correctAnswer: number }[];
+  passingScore?: number;
+  maxAttempts?: number;
 }
 
 export function validateQuizForm(input: ValidationInput): ValidationResult {
@@ -31,6 +38,14 @@ export function validateQuizForm(input: ValidationInput): ValidationResult {
 
   if (input.questions.length === 0) {
     errors.push('At least one question is required');
+  }
+
+  if (input.passingScore !== undefined && (input.passingScore < 1 || input.passingScore > 100)) {
+    errors.push('Passing score must be between 1 and 100');
+  }
+
+  if (input.maxAttempts !== undefined && input.maxAttempts < 0) {
+    errors.push('Max attempts cannot be negative');
   }
 
   input.questions.forEach((q, i) => {
@@ -63,7 +78,7 @@ export function mapAIGeneratedToForm(generated: GeneratedQuiz): MapAIResult {
     title: generated.title,
     passingScore: generated.passingScore,
     questions: generated.questions.map((q) => ({
-      id: crypto.randomUUID(),
+      id: generateId(),
       questionText: q.questionText,
       options: [...q.options],
       correctAnswer: q.correctAnswer,

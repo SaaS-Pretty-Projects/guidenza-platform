@@ -21,8 +21,13 @@ interface DraftQuestion {
   correctAnswer: number;
 }
 
+const generateId = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).substring(2, 15);
+
 const blankQuestion = (): DraftQuestion => ({
-  id: crypto.randomUUID(),
+  id: generateId(),
   questionText: '',
   options: ['', ''],
   correctAnswer: 0,
@@ -93,7 +98,7 @@ export function QuizEditor({ courseId, moduleId, moduleTitle, onClose }: QuizEdi
   };
 
   const handleSave = async () => {
-    const result = validateQuizForm({ title, questions });
+    const result = validateQuizForm({ title, questions, passingScore, maxAttempts });
     if (!result.valid) {
       setValidationErrors(result.errors);
       return;

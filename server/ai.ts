@@ -1,7 +1,11 @@
 import { db } from './firebase.js';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  throw new Error('GEMINI_API_KEY environment variable is required');
+}
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 interface GenerateQuizParams {
   moduleTitle: string;
@@ -74,9 +78,15 @@ ${moduleContent}`;
 }
 
 async function callGemini(prompt: string): Promise<string> {
-  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY,
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
@@ -84,7 +94,8 @@ async function callGemini(prompt: string): Promise<string> {
         maxOutputTokens: 4096,
       },
     }),
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     const err = await response.text();
@@ -97,8 +108,29 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 function parseJsonResponse(text: string): unknown {
-  const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim();
-  return JSON.parse(cleaned);
+  const firstBrace = text.indexOf('{');
+  const firstBracket = text.indexOf('[');
+
+  let start = -1;
+  let end = -1;
+
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    start = firstBrace;
+    end = text.lastIndexOf('}');
+  } else if (firstBracket !== -1) {
+    start = firstBracket;
+    end = text.lastIndexOf(']');
+  }
+
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error('No valid JSON structure found in response');
+  }
+
+  try {
+    return JSON.parse(text.substring(start, end + 1));
+  } catch (err) {
+    throw new Error(`Failed to parse Gemini JSON response: ${err instanceof Error ? err.message : 'unknown error'}`);
+  }
 }
 
 export async function getModuleContent(courseId: string, moduleId: string): Promise<{ title: string; content: string }> {
@@ -115,7 +147,24 @@ export async function getModuleContent(courseId: string, moduleId: string): Prom
 export async function generateAQuiz(params: GenerateQuizParams): Promise<GenerateQuizResult> {
   const prompt = buildQuizPrompt(params);
   const raw = await callGemini(prompt);
-  return parseJsonResponse(raw) as GenerateQuizResult;
+  const parsed = parseJsonResponse(raw);
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid quiz response: not an object');
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.title !== 'string' || typeof obj.passingScore !== 'number' || !Array.isArray(obj.questions)) {
+    throw new Error('Invalid quiz response: missing required fields');
+  }
+  for (const q of obj.questions) {
+    if (!q || typeof q !== 'object') throw new Error('Invalid question in quiz response');
+    const question = q as Record<string, unknown>;
+    if (typeof question.questionText !== 'string' || !Array.isArray(question.options) || typeof question.correctAnswer !== 'number') {
+      throw new Error('Invalid question structure in quiz response');
+    }
+  }
+
+  return parsed as GenerateQuizResult;
 }
 
 export async function askTutor(moduleTitle: string, moduleContent: string, question: string): Promise<string> {

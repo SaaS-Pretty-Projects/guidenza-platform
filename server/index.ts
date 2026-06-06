@@ -85,11 +85,15 @@ app.post('/api/ai/generate-quiz', async (req, res) => {
       moduleTitle: mod.title,
       moduleContent: mod.content,
       difficulty: difficulty ?? 'medium',
-      questionCount: questionCount ?? 5,
+      questionCount: Math.min(10, Math.max(1, questionCount ?? 5)),
     });
     res.json(quiz);
   } catch (err) {
     console.error('AI quiz generation error:', err);
+    if (err instanceof Error && err.message === 'Module not found') {
+      res.status(404).json({ error: 'Module not found' });
+      return;
+    }
     res.status(500).json({ error: 'Failed to generate quiz' });
   }
 });
@@ -106,6 +110,10 @@ app.post('/api/ai/tutor', async (req, res) => {
     res.json({ answer });
   } catch (err) {
     console.error('AI tutor error:', err);
+    if (err instanceof Error && err.message === 'Module not found') {
+      res.status(404).json({ error: 'Module not found' });
+      return;
+    }
     res.status(500).json({ error: 'Failed to get tutor response' });
   }
 });
@@ -118,6 +126,10 @@ app.get('/api/ai/summarize/:courseId/:moduleId', async (req, res) => {
     res.json({ summary, moduleTitle: mod.title });
   } catch (err) {
     console.error('AI summary error:', err);
+    if (err instanceof Error && err.message === 'Module not found') {
+      res.status(404).json({ error: 'Module not found' });
+      return;
+    }
     res.status(500).json({ error: 'Failed to generate summary' });
   }
 });

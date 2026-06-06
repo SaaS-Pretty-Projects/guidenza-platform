@@ -1,7 +1,7 @@
 import {
-  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
-  collection, collectionGroup, query, where, orderBy, limit, getDocs,
-  serverTimestamp, Timestamp, writeBatch,
+  doc, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, query, where, orderBy, limit, getDocs,
+  serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -69,17 +69,7 @@ export async function deleteQuiz(
   moduleId: string,
   quizId: string,
 ): Promise<void> {
-  const batch = writeBatch(db);
-  batch.delete(quizDocPath(courseId, moduleId, quizId));
-
-  const attemptsQuery = query(
-    collectionGroup(db, 'quizAttempts'),
-    where('quizId', '==', quizId),
-  );
-  const attemptsSnap = await getDocs(attemptsQuery);
-  attemptsSnap.docs.forEach((d) => batch.delete(d.ref));
-
-  await batch.commit();
+  await deleteDoc(quizDocPath(courseId, moduleId, quizId));
 }
 
 export async function getQuiz(

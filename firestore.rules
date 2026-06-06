@@ -31,7 +31,8 @@ service cloud.firestore {
           || (
             request.auth != null
             && (
-              courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
+              get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid
+              || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
               || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enrolledCourses', [])
             )
           );

@@ -24,6 +24,7 @@ export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onCl
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const initialSentRef = useRef(false);
 
   useEffect(() => {
     return () => { mountedRef.current = false; };
@@ -34,10 +35,11 @@ export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onCl
   }, [messages]);
 
   useEffect(() => {
-    if (initialQuestion) {
+    if (initialQuestion && !initialSentRef.current) {
+      initialSentRef.current = true;
       handleSend(initialQuestion);
     }
-  }, []);
+  }, [initialQuestion]);
 
   const handleSend = async (text?: string) => {
     const question = (text ?? input).trim();
