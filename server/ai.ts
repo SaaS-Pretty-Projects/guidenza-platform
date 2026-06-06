@@ -163,6 +163,18 @@ function parseJsonResponse(text: string): unknown {
 }
 
 export async function getModuleContent(courseId: string, moduleId: string): Promise<{ title: string; content: string }> {
+  // "general" is a virtual moduleId used by CoursePlayer for course-level AI tutor
+  if (moduleId === 'general') {
+    const courseDoc = await db.collection('courses').doc(courseId).get();
+    if (!courseDoc.exists) {
+      throw new Error('Module not found');
+    }
+    const courseData = courseDoc.data() as Record<string, unknown>;
+    const title = (courseData.title as string) ?? '';
+    const content = (courseData.description as string) ?? '';
+    return { title, content };
+  }
+
   const moduleDoc = await db.collection('courses').doc(courseId).collection('modules').doc(moduleId).get();
   if (!moduleDoc.exists) {
     throw new Error('Module not found');

@@ -121,7 +121,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     if (user && isEnrolled && course) {
       recordCourseOpen(user.uid).catch(console.error);
     }
-  }, [user?.uid, course?.id]);
+  }, [user?.uid, course?.id, isEnrolled]);
 
   const handleToggleWishlist = async () => {
     if (!user || !course) {

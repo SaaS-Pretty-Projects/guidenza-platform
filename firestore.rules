@@ -38,25 +38,19 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
       }
       match /modules/{moduleId}/quizzes/{quizId} {
-        allow read: if true;
-        allow create, update, delete: if isSignedIn()
-          && get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
-      }
-
-      match /modules/{moduleId}/quizzes/{quizId} {
-        // Read: preview quizzes are public; enrolled/purchased courses checked via auth token claims (no get() calls)
+        // Read: preview quizzes are public; instructors can read their own; enrolled/purchased via auth token claims
         allow read: if resource.data.preview == true
           || (
             request.auth != null
             && (
-              get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid
+              get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid
               || courseId in request.auth.token.purchasedCourses
               || courseId in request.auth.token.enrolledCourses
             )
           );
-        // Write: only course author
-        allow create, update, delete: if request.auth != null
-          && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
+        // Write: only course instructor
+        allow create, update, delete: if isSignedIn()
+          && get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
       }
     }
 

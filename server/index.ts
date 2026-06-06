@@ -30,11 +30,17 @@ async function verifyAuth(req, res, next) {
   }
 }
 
-// Helper: check if user has access to a course (purchased or enrolled)
+// Helper: check if user has access to a course (purchased, enrolled, or instructor)
 async function requireCourseAccess(auth, courseId) {
   const purchased = auth.purchasedCourses ?? [];
   const enrolled = auth.enrolledCourses ?? [];
-  return purchased.includes(courseId) || enrolled.includes(courseId);
+  if (purchased.includes(courseId) || enrolled.includes(courseId)) return true;
+  const courseDoc = await db.collection('courses').doc(courseId).get();
+  if (courseDoc.exists) {
+    const data = courseDoc.data();
+    if (data?.instructorId === auth.uid) return true;
+  }
+  return false;
 }
 
 app.post('/api/checkout', async (req, res) => {
