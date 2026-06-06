@@ -1,7 +1,7 @@
 import {
   doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
-  collection, query, where, orderBy, limit, getDocs,
-  serverTimestamp, Timestamp,
+  collection, collectionGroup, query, where, orderBy, limit, getDocs,
+  serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -10,6 +10,7 @@ export interface QuizQuestion {
   questionText: string;
   options: string[];
   correctAnswer: number;
+  explanation?: string;
 }
 
 export interface Quiz {
@@ -68,7 +69,17 @@ export async function deleteQuiz(
   moduleId: string,
   quizId: string,
 ): Promise<void> {
-  await deleteDoc(quizDocPath(courseId, moduleId, quizId));
+  const batch = writeBatch(db);
+  batch.delete(quizDocPath(courseId, moduleId, quizId));
+
+  const attemptsQuery = query(
+    collectionGroup(db, 'quizAttempts'),
+    where('quizId', '==', quizId),
+  );
+  const attemptsSnap = await getDocs(attemptsQuery);
+  attemptsSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  await batch.commit();
 }
 
 export async function getQuiz(
