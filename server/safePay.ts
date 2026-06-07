@@ -2,9 +2,9 @@ import { db } from './firebase.js';
 import admin from 'firebase-admin';
 import { CreateTransactionRequest, SafePayTransaction, SafePayWebhookPayload } from './types.js';
 
-const SAFEPAY_API_KEY = process.env.SAFEPAY_API_KEY ?? '';
-const SAFEPAY_API_SECRET = process.env.SAFEPAY_API_SECRET ?? '';
-const SAFEPAY_WEBHOOK_SECRET = process.env.SAFEPAY_WEBHOOK_SECRET ?? '';
+const SAFEPAY_API_KEY=proces..._KEY ?? '';
+const SAFEPAY_API_SECRET=proces..._CRET ?? '';
+const SAFEPAY_WEBHOOK_SECRET=proces..._CRET ?? '';
 const SAFEPAY_BASE_URL = process.env.SAFEPAY_BASE_URL ?? 'https://api.safepay.com/v1';
 
 /**
@@ -60,6 +60,7 @@ async function updateUserCourseClaims(userId: string, courseId: string): Promise
     console.error(`Failed to update custom claims for user ${userId}:`, err);
   }
 }
+
 
 /**
  * Verifies the webhook signature and updates the order + user access.

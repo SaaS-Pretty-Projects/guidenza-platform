@@ -143,6 +143,7 @@ export function InstructorDashboard() {
     const courseData = {
       title: formData.title,
       description: formData.description,
+      authorId: user.uid,
       author: user.displayName || 'Anonymous',
       instructorId: user.uid,
       price: Number(formData.price),

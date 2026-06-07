@@ -53,10 +53,12 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
   const [markingDone, setMarkingDone] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
+  const [purchaseChecking, setPurchaseChecking] = useState(true);
   const [tutorOpen, setTutorOpen] = useState<{ moduleId: string; question?: string } | null>(null);
 
   useEffect(() => {
     if (user && course) {
+      setPurchaseChecking(true);
       const checkUserData = async () => {
         const userRef = doc(db, 'users', user.uid);
         const snap = await getDoc(userRef);
@@ -80,12 +82,14 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
             setCompletedModuleIds([]);
           }
         }
+        setPurchaseChecking(false);
       };
       checkUserData();
     } else {
       setIsEnrolled(false);
       setIsWishlisted(false);
       setCompletedModules(0);
+      setPurchaseChecking(false);
     }
   }, [user, course]);
 
@@ -371,6 +375,8 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                   <PurchaseGate
                     courseId={course.id}
                     amount={course.price}
+                    purchased={purchased || isEnrolled}
+                    checking={purchaseChecking}
                     preview={
                       <div className="flex flex-col gap-2">
                         {moduleList.slice(0, 1).map((mod) => (

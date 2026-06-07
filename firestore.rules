@@ -1,7 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // ---------- helpers ----------
     function isSignedIn() {
       return request.auth != null;
@@ -12,6 +11,15 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
+    
+    // Check course access via user doc (covers free enrollees without custom claims)
+    function hasCourseAccess(courseId) {
+      return isSignedIn()
+        && (
+          courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
+          || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enrolledCourses', [])
+        );
+    }
 
     // ---------- subscriptions ----------
     match /subscriptions/{subscriptionId} {
@@ -20,22 +28,40 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /orders/{orderId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // ---------- courses ----------
     match /courses/{courseId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid;
       allow update, delete: if isSignedIn()
-        && (resource.data.instructorId == request.auth.uid || isAdmin());
+        && (
+          resource.data.authorId == request.auth.uid
+          || isAdmin()
+        );
 
       match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if isSignedIn();
-        allow update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isSignedIn()
+          && (resource.data.userId == request.auth.uid || isAdmin());
       }
       match /announcements/{announcementId} {
         allow read: if true;
-        allow create, update, delete: if isSignedIn()
-          && get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
+        allow write: if isSignedIn()
+          && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
+      }
+      match /modules/{moduleId} {
+        allow read: if resource.data.preview == true || hasCourseAccess(courseId);
+        allow write: if isSignedIn()
+          && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
       }
       match /modules/{moduleId}/quizzes/{quizId} {
         // Read: preview quizzes are public; instructors, purchasers, or enrollees can read
@@ -43,14 +69,14 @@ service cloud.firestore {
           || (
             request.auth != null
             && (
-              get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid
+              get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid
               || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
               || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enrolledCourses', [])
             )
           );
         // Write: only course instructor
         allow create, update, delete: if isSignedIn()
-          && get(/databases/$(database)/documents/courses/$(courseId)).data.instructorId == request.auth.uid;
+          && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
       }
     }
 
@@ -68,6 +94,9 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId);
         allow update, delete: if false;
+      }
+      match /{subcollection=**} {
+        allow read, write: if isOwner(userId);
       }
     }
 

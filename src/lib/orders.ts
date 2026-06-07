@@ -14,14 +14,24 @@ export interface Order {
   createdAt: any;
 }
 
+interface CourseAccessData {
+  purchasedCourses?: string[];
+  enrolledCourses?: string[];
+}
+
+export function hasCourseAccess(data: CourseAccessData | undefined, courseId: string): boolean {
+  if (!data) return false;
+  return (
+    (data.purchasedCourses ?? []).includes(courseId) ||
+    (data.enrolledCourses ?? []).includes(courseId)
+  );
+}
+
 export async function hasPurchasedCourse(uid: string, courseId: string): Promise<boolean> {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) return false;
-  const data = snap.data();
-  const purchasedCourses: string[] = data.purchasedCourses ?? [];
-  const enrolledCourses: string[] = data.enrolledCourses ?? [];
-  return purchasedCourses.includes(courseId) || enrolledCourses.includes(courseId);
+  return hasCourseAccess(snap.data(), courseId);
 }
 
 export async function getUserOrders(uid: string): Promise<Order[]> {
@@ -40,6 +50,10 @@ export async function initiateCheckout(
   amount: number,
   currency = 'PKR',
 ): Promise<string> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Course price must be greater than zero');
+  }
+
   const res = await fetch(`${API_BASE}/checkout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

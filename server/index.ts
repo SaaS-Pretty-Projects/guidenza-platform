@@ -49,13 +49,17 @@ async function requireCourseAccess(auth, courseId) {
   return false;
 }
 
-app.post('/api/checkout', async (req, res) => {
+// Protected checkout endpoint - userId comes from auth token, not request body
+app.post('/api/checkout', verifyAuth, async (req, res) => {
   try {
-    const { userId, courseId, amount, currency } = req.body;
-    if (!userId || !courseId || !amount) {
+    const auth = req.auth;
+    const { courseId, amount, currency } = req.body;
+    if (!courseId || !amount) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
+
+    const userId = auth.uid;
 
     // Create SafePay transaction
     const txn = await createTransaction({ userId, courseId, amount, currency: currency ?? 'PKR' });
@@ -91,11 +95,13 @@ app.post('/api/webhook/safepay', async (req, res) => {
   }
 });
 
-app.get('/api/orders/:userId', async (req, res) => {
+// Protected orders endpoint - user can only see their own orders
+app.get('/api/orders', verifyAuth, async (req, res) => {
   try {
+    const auth = req.auth;
     const snapshot = await db
       .collection('orders')
-      .where('userId', '==', req.params.userId)
+      .where('userId', '==', auth.uid)
       .orderBy('createdAt', 'desc')
       .get();
 
