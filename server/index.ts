@@ -135,7 +135,7 @@ app.post('/api/ai/generate-quiz', verifyAuth, async (req, res) => {
       moduleTitle: mod.title,
       moduleContent: mod.content,
       difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
-      questionCount: Math.min(10, Math.max(1, questionCount ?? 5)),
+      questionCount: Math.min(10, Math.max(1, Number(questionCount) || 5)),
     });
     res.json(quiz);
   } catch (err) {

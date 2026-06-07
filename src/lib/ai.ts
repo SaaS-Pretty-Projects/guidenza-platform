@@ -34,7 +34,7 @@ export async function generateQuiz(
     body: JSON.stringify({ courseId, moduleId, difficulty, questionCount }),
   });
   if (!res.ok) {
-    const err = await res.json();
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error(err.error ?? 'Failed to generate quiz');
   }
   return res.json();
@@ -52,7 +52,7 @@ export async function askTutor(
     body: JSON.stringify({ courseId, moduleId, question }),
   });
   if (!res.ok) {
-    const err = await res.json();
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error(err.error ?? 'Failed to get tutor response');
   }
   const data = await res.json();
@@ -66,7 +66,7 @@ export async function getModuleSummary(
   const headers = await getAuthHeaders();
   const res = await fetch(`${AI_API_BASE}/summarize/${courseId}/${moduleId}`, { headers });
   if (!res.ok) {
-    const err = await res.json();
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error(err.error ?? 'Failed to get summary');
   }
   return res.json();
