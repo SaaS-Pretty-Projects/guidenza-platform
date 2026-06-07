@@ -254,6 +254,7 @@ export function InstructorDashboard() {
           toast.error('This course has no modules. Add modules before creating quizzes.');
           return;
         }
+        setSelectedModuleIndex(0);
         setQuizManagerCourse({ id: courseId, title: data.title, modules });
       } else {
         toast.error('Course not found');
