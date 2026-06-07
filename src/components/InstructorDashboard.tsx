@@ -82,6 +82,7 @@ export function InstructorDashboard() {
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
   const [quizManagerCourse, setQuizManagerCourse] = useState<{ id: string; title: string; modules?: { id: string; title: string }[] } | null>(null);
+  const [selectedModuleIndex, setSelectedModuleIndex] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -249,7 +250,13 @@ export function InstructorDashboard() {
       const snap = await getDoc(doc(db, 'courses', courseId));
       if (snap.exists()) {
         const data = snap.data();
-        setQuizManagerCourse({ id: courseId, title: data.title, modules: data.modules ?? [] });
+        const modules = data.modules ?? [];
+        if (modules.length === 0) {
+          toast.error('This course has no modules. Add modules before creating quizzes.');
+          return;
+        }
+        setSelectedModuleIndex(0);
+        setQuizManagerCourse({ id: courseId, title: data.title, modules });
       } else {
         toast.error('Course not found');
       }
@@ -866,13 +873,34 @@ export function InstructorDashboard() {
         </div>
       )}
 
-      {/* Announcement Modal */}
-      {quizManagerCourse && (
-        <QuizEditor
-          courseId={quizManagerCourse.id}
-          modules={quizManagerCourse.modules ?? []}
-          onClose={() => setQuizManagerCourse(null)}
-        />
+      {/* Quiz Manager Modal */}
+      {quizManagerCourse && (quizManagerCourse.modules ?? []).length > 0 && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl">
+            {(quizManagerCourse.modules ?? []).length > 1 && (
+              <div className="mb-4 flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Module:</label>
+                <select
+                  value={selectedModuleIndex}
+                  onChange={(e) => setSelectedModuleIndex(Number(e.target.value))}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm"
+                >
+                  {(quizManagerCourse.modules ?? []).map((mod, idx) => (
+                    <option key={mod.id} value={idx}>{mod.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div key={(quizManagerCourse.modules ?? [])[selectedModuleIndex].id}>
+              <QuizEditor
+                courseId={quizManagerCourse.id}
+                moduleId={(quizManagerCourse.modules ?? [])[selectedModuleIndex].id}
+                moduleTitle={(quizManagerCourse.modules ?? [])[selectedModuleIndex].title}
+                onClose={() => { setQuizManagerCourse(null); setSelectedModuleIndex(0); }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {isAnnouncementModalOpen && announcementCourse && (

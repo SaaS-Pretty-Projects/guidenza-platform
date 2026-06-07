@@ -3,6 +3,7 @@ import cors from 'cors';
 import admin from 'firebase-admin';
 import { db } from './firebase.js';
 import { createTransaction, handleWebhook } from './safePay.js';
+import { generateAQuiz, askTutor, generateSummary, getModuleContent } from './ai.js';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
@@ -27,6 +28,25 @@ async function verifyAuth(req, res, next) {
     console.error('Auth verification failed:', err);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
+
+// Helper: check if user has access to a course (purchased, enrolled, or instructor)
+async function requireCourseAccess(auth, courseId) {
+  const purchased = auth.purchasedCourses ?? [];
+  const enrolled = auth.enrolledCourses ?? [];
+  if (purchased.includes(courseId) || enrolled.includes(courseId)) return true;
+  const courseDoc = await db.collection('courses').doc(courseId).get();
+  if (courseDoc.exists) {
+    const data = courseDoc.data();
+    if (data?.authorId === auth.uid || data?.instructorId === auth.uid) return true;
+  }
+  // Fallback: check Firestore user doc (covers free-course enrollees whose claims aren't set)
+  const userDoc = await db.collection('users').doc(auth.uid).get();
+  if (userDoc.exists) {
+    const userData = userDoc.data();
+    if ((userData?.purchasedCourses || []).includes(courseId) || (userData?.enrolledCourses || []).includes(courseId)) return true;
+  }
+  return false;
 }
 
 // Protected checkout endpoint - userId comes from auth token, not request body
@@ -90,6 +110,93 @@ app.get('/api/orders', verifyAuth, async (req, res) => {
   } catch (err) {
     console.error('Orders fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// -- AI Routes (protected) --
+
+app.post('/api/ai/generate-quiz', verifyAuth, async (req, res) => {
+  try {
+    const auth = req.auth;
+    const { courseId, moduleId, difficulty, questionCount } = req.body;
+    if (!courseId || !moduleId) {
+      res.status(400).json({ error: 'Missing courseId or moduleId' });
+      return;
+    }
+
+    // Authorization: ensure user has access to this course
+    const hasAccess = await requireCourseAccess(auth, courseId);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Not enrolled in this course' });
+    }
+
+    const mod = await getModuleContent(courseId, moduleId);
+    const quiz = await generateAQuiz({
+      moduleTitle: mod.title,
+      moduleContent: mod.content,
+      difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
+      questionCount: Math.min(10, Math.max(1, Number(questionCount) || 5)),
+    });
+    res.json(quiz);
+  } catch (err) {
+    console.error('AI quiz generation error:', err);
+    if (err instanceof Error && err.message === 'Module not found') {
+      res.status(404).json({ error: 'Module not found' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to generate quiz' });
+  }
+});
+
+app.post('/api/ai/tutor', verifyAuth, async (req, res) => {
+  try {
+    const auth = req.auth;
+    const { courseId, moduleId, question } = req.body;
+    if (!courseId || !moduleId || !question) {
+      res.status(400).json({ error: 'Missing courseId, moduleId, or question' });
+      return;
+    }
+
+    // Authorization
+    const hasAccess = await requireCourseAccess(auth, courseId);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Not enrolled in this course' });
+    }
+
+    const mod = await getModuleContent(courseId, moduleId);
+    const answer = await askTutor(mod.title, mod.content, question);
+    res.json({ answer });
+  } catch (err) {
+    console.error('AI tutor error:', err);
+    if (err instanceof Error && err.message === 'Module not found') {
+      res.status(404).json({ error: 'Module not found' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to get tutor response' });
+  }
+});
+
+app.get('/api/ai/summarize/:courseId/:moduleId', verifyAuth, async (req, res) => {
+  try {
+    const auth = req.auth;
+    const { courseId, moduleId } = req.params;
+
+    // Authorization
+    const hasAccess = await requireCourseAccess(auth, courseId);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Not enrolled in this course' });
+    }
+
+    const mod = await getModuleContent(courseId, moduleId);
+    const summary = await generateSummary(mod.title, mod.content);
+    res.json({ summary, moduleTitle: mod.title });
+  } catch (err) {
+    console.error('AI summary error:', err);
+    if (err instanceof Error && err.message === 'Module not found') {
+      res.status(404).json({ error: 'Module not found' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to generate summary' });
   }
 });
 

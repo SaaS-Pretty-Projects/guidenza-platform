@@ -67,18 +67,26 @@ export function CoursePlayer({ courseId, courseTitle, courseDescription, totalMo
 
   const toggleModuleComplete = async (moduleId: number) => {
     if (!user) return;
+    const prev = completedModules;
     const newCompleted = completedModules.includes(moduleId)
       ? completedModules.filter(id => id !== moduleId)
       : [...completedModules, moduleId];
 
     setCompletedModules(newCompleted);
-    const userRef = doc(db, 'users', user.uid);
-    await updateDoc(userRef, {
-      [`moduleProgress.${courseId}`]: newCompleted,
-      [`progress.${courseId}`]: newCompleted.length
-    });
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        [`moduleProgress.${courseId}`]: newCompleted,
+        [`progress.${courseId}`]: newCompleted.length
+      });
+    } catch (err) {
+      console.error('Failed to save progress', err);
+      toast.error('Failed to save progress');
+      setCompletedModules(prev);
+      return;
+    }
 
-    if (newCompleted.length === totalModules && !completedModules.includes(moduleId)) {
+    if (newCompleted.length === totalModules && !prev.includes(moduleId)) {
       toast.success('Course completed! You can now generate your certificate.');
     }
   };
@@ -155,13 +163,11 @@ export function CoursePlayer({ courseId, courseTitle, courseDescription, totalMo
         <div className="lg:col-span-2 space-y-2">
           {modules.map((mod) => (
             <div key={mod.id} className="liquid-glass rounded-xl border border-white/5 overflow-hidden">
-              <button
-                onClick={() => setExpandedModule(expandedModule === mod.id ? null : mod.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition"
-              >
+              <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition">
                 <button
-                  onClick={(e) => { e.stopPropagation(); toggleModuleComplete(mod.id); }}
+                  onClick={() => toggleModuleComplete(mod.id)}
                   className="shrink-0"
+                  aria-label={completedModules.includes(mod.id) ? 'Mark incomplete' : 'Mark complete'}
                 >
                   {completedModules.includes(mod.id) ? (
                     <CheckCircle2 className="w-5 h-5 text-green-400" />
@@ -169,14 +175,17 @@ export function CoursePlayer({ courseId, courseTitle, courseDescription, totalMo
                     <Circle className="w-5 h-5 text-muted-foreground" />
                   )}
                 </button>
-                <div className="flex-1 text-left">
+                <button
+                  onClick={() => setExpandedModule(expandedModule === mod.id ? null : mod.id)}
+                  className="flex-1 text-left"
+                >
                   <p className={`text-sm font-medium ${completedModules.includes(mod.id) ? 'line-through text-muted-foreground' : ''}`}>
                     {mod.title}
                   </p>
-                </div>
+                </button>
                 <span className="text-xs text-muted-foreground">{mod.duration}</span>
                 {expandedModule === mod.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
+              </div>
               {expandedModule === mod.id && (
                 <div className="px-4 pb-3 pl-12 space-y-1.5">
                   {mod.lessons.map((lesson) => (
@@ -237,12 +246,14 @@ export function CoursePlayer({ courseId, courseTitle, courseDescription, totalMo
         </div>
       </div>
 
-      <AITutor
-        courseTitle={courseTitle}
-        courseDescription={courseDescription}
-        isOpen={showTutor}
-        onClose={() => setShowTutor(false)}
-      />
+      {showTutor && (
+        <AITutor
+          courseId={courseId}
+          moduleId="general"
+          moduleTitle={courseTitle}
+          onClose={() => setShowTutor(false)}
+        />
+      )}
     </div>
   );
 }

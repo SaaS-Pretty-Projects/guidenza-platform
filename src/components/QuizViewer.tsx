@@ -127,8 +127,15 @@ export function QuizViewer({ courseId, moduleId, quiz, onQuizPassed, onClose }: 
           )}
           {(!result || result.canRetry) && (
             <button
-              onClick={handleSubmit}
-              disabled={!allAnswered || submitting}
+              onClick={() => {
+                if (result) {
+                  setResult(null);
+                  setSelections({});
+                } else {
+                  handleSubmit();
+                }
+              }}
+              disabled={result ? false : (!allAnswered || submitting)}
               className="px-4 py-2 bg-foreground text-background text-sm font-semibold rounded-full disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Submitting...' : result ? 'Retry' : 'Submit'}

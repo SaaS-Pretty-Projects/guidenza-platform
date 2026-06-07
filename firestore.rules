@@ -12,12 +12,13 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
     
-    // Optimized: uses auth token custom claims instead of get() calls
+    // Check course access via user doc (covers free enrollees without custom claims)
     function hasCourseAccess(courseId) {
       return isSignedIn()
         && (
-          courseId in request.auth.token.purchasedCourses
-          || courseId in request.auth.token.enrolledCourses
+          get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid
+          || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
+          || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enrolledCourses', [])
         );
     }
 
@@ -59,14 +60,22 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
       }
       match /modules/{moduleId} {
-        // SECURITY FIX: uses auth token claims instead of get() calls
         allow read: if resource.data.preview == true || hasCourseAccess(courseId);
         allow write: if isSignedIn()
           && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
       }
       match /modules/{moduleId}/quizzes/{quizId} {
-        // SECURITY FIX: uses auth token claims instead of get() calls
-        allow read: if resource.data.preview == true || hasCourseAccess(courseId);
+        // Read: preview quizzes are public; instructors, purchasers, or enrollees can read
+        allow read: if resource.data.preview == true
+          || (
+            request.auth != null
+            && (
+              get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid
+              || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('purchasedCourses', [])
+              || courseId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('enrolledCourses', [])
+            )
+          );
+        // Write: only course instructor
         allow create, update, delete: if isSignedIn()
           && get(/databases/$(database)/documents/courses/$(courseId)).data.authorId == request.auth.uid;
       }

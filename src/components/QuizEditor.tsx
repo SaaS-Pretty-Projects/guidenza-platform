@@ -1,399 +1,348 @@
-import React, { useState, useEffect } from 'react';
-import { createQuiz, updateQuiz, deleteQuiz, getModuleQuizzes, type Quiz, type QuizQuestion } from '../lib/quizzes';
-import { Plus, Trash2, Edit2, ChevronDown, ChevronRight, X, Save } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Sparkles } from 'lucide-react';
+import {
+  createQuiz, updateQuiz, deleteQuiz, getModuleQuizzes,
+  type Quiz, type QuizQuestion,
+} from '../lib/quizzes';
+import { generateQuiz as generateAIQuiz, type Difficulty } from '../lib/ai';
+import { validateQuizForm, mapAIGeneratedToForm } from '../lib/quizForm';
 
 interface QuizEditorProps {
   courseId: string;
-  modules: { id: string; title: string }[];
+  moduleId: string;
+  moduleTitle: string;
   onClose: () => void;
 }
 
-function generateId(): string {
-  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+interface DraftQuestion {
+  id: string;
+  questionText: string;
+  options: string[];
+  correctAnswer: number;
 }
 
-function emptyQuestion(): QuizQuestion {
-  return {
-    id: generateId(),
-    questionText: '',
-    options: ['', '', '', ''],
-    correctAnswer: 0,
-  };
-}
+const generateId = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).substring(2, 15);
 
-export function QuizEditor({ courseId, modules, onClose }: QuizEditorProps) {
-  const [quizzes, setQuizzes] = useState<Record<string, Quiz[]>>({});
-  const [loading, setLoading] = useState(true);
-  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
-  const [editingQuiz, setEditingQuiz] = useState<{ moduleId: string; quiz: Quiz } | null>(null);
-  const [addingForModule, setAddingForModule] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    passingScore: 70,
-    maxAttempts: 0,
-    questions: [emptyQuestion()],
-  });
-  const [saving, setSaving] = useState(false);
+const blankQuestion = (): DraftQuestion => ({
+  id: generateId(),
+  questionText: '',
+  options: ['', ''],
+  correctAnswer: 0,
+});
+
+export function QuizEditor({ courseId, moduleId, moduleTitle, onClose }: QuizEditorProps) {
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [title, setTitle] = useState('');
+  const [passingScore, setPassingScore] = useState(70);
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [questions, setQuestions] = useState<DraftQuestion[]>([blankQuestion()]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [aiDifficulty, setAIDifficulty] = useState<Difficulty>('medium');
+  const [aiGenerating, setAIGenerating] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
-    loadAllQuizzes();
-  }, [courseId]);
+    let cancelled = false;
+    getModuleQuizzes(courseId, moduleId)
+      .then((q) => { if (!cancelled) setQuizzes(q); })
+      .catch((err) => { if (!cancelled) console.error('Failed to load quizzes', err); });
+    return () => { cancelled = true; };
+  }, [courseId, moduleId]);
 
-  async function loadAllQuizzes() {
-    setLoading(true);
-    const results: Record<string, Quiz[]> = {};
-    for (const mod of modules) {
-      try {
-        results[mod.id] = await getModuleQuizzes(courseId, mod.id);
-      } catch {
-        results[mod.id] = [];
-      }
-    }
-    setQuizzes(results);
-    setLoading(false);
-  }
+  const addQuestion = () => {
+    setQuestions((prev) => [...prev, blankQuestion()]);
+  };
 
-  function toggleModule(moduleId: string) {
-    setExpandedModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] }));
-  }
+  const removeQuestion = (id: string) => {
+    setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((q) => q.id !== id)));
+  };
 
-  function handleAddQuiz(moduleId: string) {
-    setEditingQuiz(null);
-    setAddingForModule(moduleId);
-    setFormData({
-      title: '',
-      passingScore: 70,
-      maxAttempts: 0,
-      questions: [emptyQuestion()],
-    });
-  }
+  const updateQuestionField = (id: string, field: 'questionText' | 'correctAnswer', value: string | number) => {
+    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, [field]: value } : q)));
+  };
 
-  function handleEditQuiz(moduleId: string, quiz: Quiz) {
-    setAddingForModule(null);
-    setEditingQuiz({ moduleId, quiz });
-    setFormData({
-      title: quiz.title,
-      passingScore: quiz.passingScore,
-      maxAttempts: quiz.maxAttempts,
-      questions: quiz.questions.length > 0 ? quiz.questions : [emptyQuestion()],
-    });
-  }
+  const updateOption = (qId: string, optIdx: number, value: string) => {
+    setQuestions((prev) => prev.map((q) => (q.id === qId
+      ? { ...q, options: q.options.map((o, i) => (i === optIdx ? value : o)) }
+      : q)));
+  };
 
-  function cancelForm() {
-    setEditingQuiz(null);
-    setAddingForModule(null);
-  }
+  const addOption = (qId: string) => {
+    setQuestions((prev) => prev.map((q) => (q.id === qId
+      ? { ...q, options: [...q.options, ''] }
+      : q)));
+  };
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!formData.title.trim()) {
-      toast.error('Please enter a quiz title');
+  const removeOption = (qId: string) => {
+    setQuestions((prev) => prev.map((q) => {
+      if (q.id !== qId || q.options.length <= 2) return q;
+      return {
+        ...q,
+        options: q.options.slice(0, -1),
+        correctAnswer: Math.min(q.correctAnswer, q.options.length - 2),
+      };
+    }));
+  };
+
+  const resetForm = () => {
+    setTitle('');
+    setPassingScore(70);
+    setMaxAttempts(3);
+    setQuestions([blankQuestion()]);
+    setEditingId(null);
+    setValidationErrors([]);
+  };
+
+  const handleSave = async () => {
+    const result = validateQuizForm({ title, questions, passingScore, maxAttempts });
+    if (!result.valid) {
+      setValidationErrors(result.errors);
       return;
     }
-    setSaving(true);
+    setValidationErrors([]);
+    setLoading(true);
     try {
       const quizData = {
-        title: formData.title,
-        passingScore: formData.passingScore,
-        maxAttempts: formData.maxAttempts,
-        questions: formData.questions,
+        title: title.trim(),
+        passingScore,
+        maxAttempts,
+        questions: questions as QuizQuestion[],
       };
-
-      if (editingQuiz) {
-        await updateQuiz(courseId, editingQuiz.moduleId, editingQuiz.quiz.id!, quizData);
-        toast.success('Quiz updated');
-        await loadModuleQuizzes(editingQuiz.moduleId);
-      } else if (addingForModule) {
-        await createQuiz(courseId, addingForModule, quizData);
-        toast.success('Quiz created');
-        await loadModuleQuizzes(addingForModule);
+      if (editingId) {
+        await updateQuiz(courseId, moduleId, editingId, quizData);
+      } else {
+        await createQuiz(courseId, moduleId, quizData);
       }
-      cancelForm();
+      resetForm();
+      const updated = await getModuleQuizzes(courseId, moduleId);
+      setQuizzes(updated);
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to save quiz');
+      console.error('Failed to save quiz', err);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
-  }
+  };
 
-  async function loadModuleQuizzes(moduleId: string) {
-    try {
-      const data = await getModuleQuizzes(courseId, moduleId);
-      setQuizzes(prev => ({ ...prev, [moduleId]: data }));
-    } catch {
-      // ignore
-    }
-  }
+  const handleEdit = (quiz: Quiz) => {
+    setTitle(quiz.title);
+    setPassingScore(quiz.passingScore);
+    setMaxAttempts(quiz.maxAttempts);
+    setQuestions(quiz.questions.map((q) => ({
+      id: q.id,
+      questionText: q.questionText,
+      options: [...q.options],
+      correctAnswer: q.correctAnswer,
+    })));
+    setEditingId(quiz.id ?? null);
+    setValidationErrors([]);
+  };
 
-  async function handleDeleteQuiz(moduleId: string, quiz: Quiz) {
-    if (!window.confirm(`Delete quiz "${quiz.title}"? This cannot be undone.`)) return;
+  const handleDelete = async (quizId: string) => {
     try {
-      await deleteQuiz(courseId, moduleId, quiz.id!);
-      toast.success('Quiz deleted');
-      await loadModuleQuizzes(moduleId);
+      await deleteQuiz(courseId, moduleId, quizId);
+      setQuizzes((prev) => prev.filter((q) => q.id !== quizId));
+      if (editingId === quizId) resetForm();
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete quiz');
+      console.error('Failed to delete quiz', err);
     }
-  }
+  };
 
-  function addQuestion() {
-    setFormData(prev => ({
-      ...prev,
-      questions: [...prev.questions, emptyQuestion()],
-    }));
-  }
-
-  function removeQuestion(index: number) {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.filter((_, i) => i !== index),
-    }));
-  }
-
-  function updateQuestionField(index: number, value: string) {
-    setFormData(prev => {
-      const questions = [...prev.questions];
-      questions[index] = { ...questions[index], questionText: value };
-      return { ...prev, questions };
-    });
-  }
-
-  function updateCorrectAnswer(index: number, value: number) {
-    setFormData(prev => {
-      const questions = [...prev.questions];
-      questions[index] = { ...questions[index], correctAnswer: value };
-      return { ...prev, questions };
-    });
-  }
-
-  function updateOption(questionIndex: number, optionIndex: number, value: string) {
-    setFormData(prev => {
-      const questions = [...prev.questions];
-      const options = [...questions[questionIndex].options];
-      options[optionIndex] = value;
-      questions[questionIndex] = { ...questions[questionIndex], options };
-      return { ...prev, questions };
-    });
-  }
+  const handleAIGenerate = async () => {
+    setAIGenerating(true);
+    try {
+      const generated = await generateAIQuiz(courseId, moduleId, aiDifficulty, 5);
+      const mapped = mapAIGeneratedToForm(generated);
+      setTitle(mapped.title);
+      setPassingScore(mapped.passingScore);
+      setQuestions(mapped.questions);
+      setEditingId(null);
+      setValidationErrors([]);
+    } catch (err) {
+      console.error('AI generation failed', err);
+    } finally {
+      setAIGenerating(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-background border border-white/10 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative shadow-2xl custom-scrollbar">
-        <div className="sticky top-0 bg-background z-10 flex items-center justify-between p-8 pb-4 border-b border-white/10">
-          <h2 className="text-2xl font-semibold">Quiz Manager</h2>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-white/10"
-          >
-            <X size={18} />
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Quizzes for {moduleTitle}</h3>
+        <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
+          Close
+        </button>
+      </div>
 
-        {editingQuiz || addingForModule ? (
-          <form onSubmit={handleSave} className="p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">
-                {editingQuiz ? 'Edit Quiz' : 'Add Quiz'}
-              </h3>
-              <span className="text-sm text-muted-foreground">
-                {editingQuiz
-                  ? `Module: ${modules.find(m => m.id === editingQuiz.moduleId)?.title ?? editingQuiz.moduleId}`
-                  : `Module: ${modules.find(m => m.id === addingForModule)?.title ?? addingForModule}`}
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">Title</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={e => setFormData({ ...formData, title: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-foreground focus:outline-none focus:border-white/20"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-5">
+      {quizzes.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs uppercase tracking-wider text-muted-foreground">Existing Quizzes</h4>
+          {quizzes.map((q) => (
+            <div
+              key={q.id}
+              className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02]"
+            >
               <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">Passing Score (0-100)</label>
-                <input
-                  type="number"
-                  value={formData.passingScore}
-                  onChange={e => setFormData({ ...formData, passingScore: Math.min(100, Math.max(0, Number(e.target.value))) })}
-                  min={0}
-                  max={100}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-foreground focus:outline-none focus:border-white/20"
-                />
+                <p className="text-sm font-medium">{q.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {q.questions.length} questions &middot; {q.passingScore}% to pass &middot; {q.maxAttempts || '∞'} attempts
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">Max Attempts (0 = unlimited)</label>
-                <input
-                  type="number"
-                  value={formData.maxAttempts}
-                  onChange={e => setFormData({ ...formData, maxAttempts: Math.max(0, Number(e.target.value)) })}
-                  min={0}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-foreground focus:outline-none focus:border-white/20"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-medium text-muted-foreground">Questions</label>
+              <div className="flex gap-2">
                 <button
-                  type="button"
-                  onClick={addQuestion}
-                  className="text-sm text-foreground font-medium flex items-center gap-1 hover:opacity-80 transition-opacity"
+                  onClick={() => handleEdit(q)}
+                  className="text-xs text-muted-foreground hover:text-foreground border border-white/10 px-2 py-1 rounded-md"
                 >
-                  <Plus size={14} /> Add Question
+                  Edit
+                </button>
+                <button
+                  onClick={() => q.id && handleDelete(q.id)}
+                  className="text-xs text-red-400 hover:text-red-300 border border-red-500/20 px-2 py-1 rounded-md"
+                >
+                  Delete
                 </button>
               </div>
-              <div className="space-y-4">
-                {formData.questions.map((q, qi) => (
-                  <div key={q.id} className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <label className="text-xs font-medium text-muted-foreground">Question {qi + 1}</label>
-                      {formData.questions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeQuestion(qi)}
-                          className="text-red-400 hover:text-red-300 transition-colors shrink-0"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                    <textarea
-                      value={q.questionText}
-                      onChange={e => updateQuestionField(qi, e.target.value)}
-                      className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-foreground focus:outline-none focus:border-white/20 min-h-[60px] text-sm"
-                      placeholder="Enter your question..."
-                      required
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {q.options.map((opt, oi) => (
-                        <div key={oi} className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name={`correct-${q.id}`}
-                            checked={q.correctAnswer === oi}
-                            onChange={() => updateCorrectAnswer(qi, oi)}
-                            className="accent-white cursor-pointer shrink-0"
-                          />
-                          <input
-                            type="text"
-                            value={opt}
-                            onChange={e => updateOption(qi, oi, e.target.value)}
-                            className="w-full bg-black/30 border border-white/10 rounded-lg p-2 text-sm text-foreground focus:outline-none focus:border-white/20"
-                            placeholder={`Option ${oi + 1}`}
-                            required
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">Radio button marks the correct answer</p>
-                  </div>
-                ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium">{editingId ? 'Edit Quiz' : 'New Quiz'}</h4>
+          <div className="flex items-center gap-2">
+            <select
+              value={aiDifficulty}
+              onChange={(e) => setAIDifficulty(e.target.value as Difficulty)}
+              className="bg-background border border-white/10 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-white/30"
+              aria-label="AI generation difficulty"
+            >
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+            <button
+              onClick={handleAIGenerate}
+              disabled={aiGenerating}
+              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 border border-purple-500/30 px-2 py-1 rounded-lg disabled:opacity-50"
+            >
+              <Sparkles size={12} />
+              {aiGenerating ? 'Generating...' : 'Generate with AI'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Quiz Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Module 1 Quiz"
+            className="w-full bg-background border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-white/30"
+          />
+        </div>
+
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground block mb-1">Passing Score (%)</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={passingScore}
+              onChange={(e) => setPassingScore(Number(e.target.value))}
+              className="w-full bg-background border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-white/30"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground block mb-1">Max Attempts (0 = ∞)</label>
+            <input
+              type="number"
+              min={0}
+              value={maxAttempts}
+              onChange={(e) => setMaxAttempts(Number(e.target.value))}
+              className="w-full bg-background border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-white/30"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-muted-foreground">Questions</label>
+            <button onClick={addQuestion} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+              <Plus size={12} /> Add Question
+            </button>
+          </div>
+          {questions.map((q, qi) => (
+            <div key={q.id} className="p-3 rounded-lg border border-white/5 bg-white/[0.03] space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-medium">Q{qi + 1}</span>
+                <input
+                  value={q.questionText}
+                  onChange={(e) => updateQuestionField(q.id, 'questionText', e.target.value)}
+                  placeholder="Question text..."
+                  className="flex-1 bg-background border border-white/10 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-white/30"
+                />
+                <button onClick={() => removeQuestion(q.id)} className="text-red-400 hover:text-red-300" aria-label="Remove question">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              {q.options.map((opt, oi) => (
+                <div key={oi} className="flex items-center gap-2 ml-4">
+                  <input
+                    type="radio"
+                    name={`correct-${q.id}`}
+                    checked={q.correctAnswer === oi}
+                    onChange={() => updateQuestionField(q.id, 'correctAnswer', oi)}
+                    aria-label={`Mark option ${oi + 1} as correct`}
+                  />
+                  <input
+                    value={opt}
+                    onChange={(e) => updateOption(q.id, oi, e.target.value)}
+                    placeholder={`Option ${oi + 1}`}
+                    className="flex-1 bg-background border border-white/10 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-white/30"
+                  />
+                </div>
+              ))}
+              <div className="ml-4 flex gap-3 text-xs">
+                <button onClick={() => addOption(q.id)} className="text-muted-foreground hover:text-foreground">
+                  + Add option
+                </button>
+                {q.options.length > 2 && (
+                  <button onClick={() => removeOption(q.id)} className="text-red-400 hover:text-red-300">
+                    - Remove last option
+                  </button>
+                )}
               </div>
             </div>
+          ))}
+        </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={cancelForm}
-                className="px-6 py-3 rounded-full font-semibold border border-white/10 hover:bg-white/5 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-3 rounded-full font-semibold bg-foreground text-background hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center gap-2"
-              >
-                <Save size={16} />
-                {saving ? 'Saving...' : 'Save Quiz'}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="p-8 space-y-4">
-            {loading ? (
-              <p className="text-muted-foreground text-center py-8">Loading quizzes...</p>
-            ) : modules.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No modules found for this course.</p>
-            ) : (
-              modules.map(mod => {
-                const modQuizzes = quizzes[mod.id] ?? [];
-                const expanded = expandedModules[mod.id] ?? true;
-                return (
-                  <div key={mod.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleModule(mod.id)}
-                      className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors text-left"
-                    >
-                      <span className="font-medium">{mod.title}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">{modQuizzes.length} quiz{modQuizzes.length !== 1 ? 'zes' : ''}</span>
-                        {expanded ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
-                      </div>
-                    </button>
-                    {expanded && (
-                      <div className="border-t border-white/10 p-4 space-y-3">
-                        {modQuizzes.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-4">No quizzes yet.</p>
-                        ) : (
-                          modQuizzes.map(quiz => (
-                            <div key={quiz.id} className="flex items-center justify-between bg-black/30 border border-white/10 rounded-lg px-4 py-3">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium truncate">{quiz.title}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {quiz.questions.length} question{quiz.questions.length !== 1 ? 's' : ''}
-                                  {' · '}Pass: {quiz.passingScore}%
-                                  {quiz.maxAttempts > 0 ? ` · Max: ${quiz.maxAttempts}` : ' · Unlimited'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0 ml-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditQuiz(mod.id, quiz)}
-                                  className="w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                                  title="Edit Quiz"
-                                >
-                                  <Edit2 size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteQuiz(mod.id, quiz)}
-                                  className="w-8 h-8 bg-white/5 hover:bg-red-500/20 rounded-full flex items-center justify-center text-muted-foreground hover:text-red-400 transition-colors"
-                                  title="Delete Quiz"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleAddQuiz(mod.id)}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-white/10 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
-                        >
-                          <Plus size={14} />
-                          Add Quiz
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+        {validationErrors.length > 0 && (
+          <ul className="text-xs text-red-400 space-y-1" role="alert">
+            {validationErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
         )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          {editingId && (
+            <button onClick={resetForm} className="px-4 py-2 text-sm text-muted-foreground border border-white/10 rounded-full">
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={loading || !title.trim()}
+            className="px-4 py-2 bg-foreground text-background text-sm font-semibold rounded-full disabled:opacity-50"
+          >
+            {loading ? 'Saving...' : editingId ? 'Update Quiz' : 'Create Quiz'}
+          </button>
+        </div>
       </div>
     </div>
   );

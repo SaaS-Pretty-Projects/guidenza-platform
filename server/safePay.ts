@@ -46,6 +46,7 @@ export async function createTransaction(
 /** Helper: update user's custom claims with purchased/enrolled courses */
 async function updateUserCourseClaims(userId: string, courseId: string): Promise<void> {
   try {
+    // Get current user record to read existing claims
     const userRecord = await admin.auth().getUser(userId);
     const currentClaims = userRecord.customClaims || {};
     const purchased = Array.from(new Set([...(currentClaims.purchasedCourses || []), courseId]));
@@ -59,6 +60,7 @@ async function updateUserCourseClaims(userId: string, courseId: string): Promise
     console.error(`Failed to update custom claims for user ${userId}:`, err);
   }
 }
+
 
 /**
  * Verifies the webhook signature and updates the order + user access.

@@ -1,22 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PlayCircle, BookOpen, Clock, CheckCircle2, Heart, Star, Download } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useCredits } from '../contexts/CreditsContext';
-import { db, auth } from '../lib/firebase';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { X, PlayCircle, CheckCircle2, Heart, Star, Download, Sparkles } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { db } from '../lib/firebase';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, markQuizPassed, CourseModule } from '../lib/learningData';
-import { generateCertificatePdf } from '../lib/certificate';
-import { getModuleQuizzes, hasPassedQuiz, type Quiz } from '../lib/quizzes';
-import { QuizViewer } from './QuizViewer';
+import { jsPDF } from 'jspdf';
+import { enrollInCourse, getProgressForCourse, recordCourseOpen, markModuleComplete, CourseModule } from '../lib/learningData';
 import { CheckoutButton } from './CheckoutButton';
 import { PurchaseGate } from './PurchaseGate';
 import { hasPurchasedCourse } from '../lib/orders';
+import { AITutor } from './AITutor';
 
 interface Course {
   id: string;
@@ -46,7 +42,6 @@ interface CoursePreviewProps {
 
 export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const { user } = useAuth();
-  const { spend, tier } = useCredits();
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [completedModules, setCompletedModules] = useState(0);
@@ -56,38 +51,42 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
   const [sortOrder, setSortOrder] = useState<'newest' | 'highest' | 'lowest'>('newest');
   const [moduleList, setModuleList] = useState<CourseModule[]>([]);
   const [completedModuleIds, setCompletedModuleIds] = useState<string[]>([]);
-  const [quizPassedModuleIds, setQuizPassedModuleIds] = useState<string[]>([]);
-  const [moduleQuizzes, setModuleQuizzes] = useState<Record<string, Quiz[]>>({});
-  const [activeQuiz, setActiveQuiz] = useState<{ moduleId: string; quiz: Quiz } | null>(null);
   const [markingDone, setMarkingDone] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
+  const [purchaseChecking, setPurchaseChecking] = useState(true);
+  const [tutorOpen, setTutorOpen] = useState<{ moduleId: string; question?: string } | null>(null);
 
   useEffect(() => {
     if (user && course) {
+      setPurchaseChecking(true);
       const checkUserData = async () => {
-        const userRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          const enrolledCourses: string[] = data.enrolledCourses || [];
-          const wishlist: string[] = data.wishlist || [];
-          const enrolled = enrolledCourses.includes(course.id);
-          setIsEnrolled(enrolled);
-          setIsWishlisted(wishlist.includes(course.id));
-          const purchasedCourses: string[] = data.purchasedCourses ?? [];
-          setPurchased(purchasedCourses.includes(course.id));
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const snap = await getDoc(userRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            const enrolledCourses: string[] = data.enrolledCourses || [];
+            const wishlist: string[] = data.wishlist || [];
+            const enrolled = enrolledCourses.includes(course.id);
+            setIsEnrolled(enrolled);
+            setIsWishlisted(wishlist.includes(course.id));
+            const purchasedCourses: string[] = data.purchasedCourses ?? [];
+            setPurchased(purchasedCourses.includes(course.id));
 
-          if (enrolled) {
-            const progress = await getProgressForCourse(user.uid, course.id);
-            const completed = progress?.completedModules ?? [];
-            setCompletedModuleIds(completed);
-            setCompletedModules(completed.length);
-            setQuizPassedModuleIds(progress?.quizPassedModules ?? []);
-          } else {
-            setCompletedModules(0);
-            setCompletedModuleIds([]);
-            setQuizPassedModuleIds([]);
+            if (enrolled) {
+              const progress = await getProgressForCourse(user.uid, course.id);
+              const completed = progress?.completedModules ?? [];
+              setCompletedModuleIds(completed);
+              setCompletedModules(completed.length);
+            } else {
+              setCompletedModules(0);
+              setCompletedModuleIds([]);
+            }
           }
+        } catch (err) {
+          console.error('Failed to check user data:', err);
+        } finally {
+          setPurchaseChecking(false);
         }
       };
       checkUserData();
@@ -95,6 +94,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       setIsEnrolled(false);
       setIsWishlisted(false);
       setCompletedModules(0);
+      setPurchaseChecking(false);
     }
   }, [user, course]);
 
@@ -125,70 +125,12 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     setModuleList(course.modules ?? []);
   }, [course]);
 
-  // Effect: fetch quizzes per module
-  useEffect(() => {
-    if (!user || !isEnrolled || !course || moduleList.length === 0) return;
-    let cancelled = false;
-    const fetchQuizzes = async () => {
-      const result: Record<string, Quiz[]> = {};
-      for (const mod of moduleList) {
-        const qs = await getModuleQuizzes(course.id, mod.id);
-        if (!cancelled) result[mod.id] = qs;
-      }
-      if (!cancelled) setModuleQuizzes(result);
-    };
-    fetchQuizzes();
-    return () => { cancelled = true; };
-  }, [user, isEnrolled, course, moduleList.length]);
-
   // Effect: streak tracking — fires when enrollment confirmed
   useEffect(() => {
     if (user && isEnrolled && course) {
       recordCourseOpen(user.uid).catch(console.error);
     }
-    const price = course?.price || 0;
-    const creditCost = price * 100;
-    let creditsDeducted = false;
-    if (price > 0 && tier === 'free') {
-      const success = await spend(creditCost, `Enrolled in: ${course?.title}`);
-      if (!success) {
-        toast.error(`Need ${creditCost} credits to enroll. Visit Credits page to top up.`);
-        return;
-      }
-      creditsDeducted = true;
-    }
-    toast.loading("Enrolling...", { id: "enroll" });
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        savedCourses: arrayUnion(course?.id),
-        [`progress.${course?.id}`]: 1
-      }).catch(async (e) => {
-        if (e.code === 'not-found') {
-          const { setDoc } = await import('firebase/firestore');
-          await setDoc(userRef, { savedCourses: [course?.id], progress: { [course?.id as string]: 1 }, wishlist: [], credits: 0 });
-        } else {
-          throw e;
-        }
-      });
-      setIsEnrolled(true);
-      setCompletedModules(1);
-      toast.success("Successfully enrolled!", { id: "enroll" });
-    } catch (err) {
-      console.error("Error saving course", err);
-      if (creditsDeducted) {
-        const idToken = await auth.currentUser?.getIdToken();
-        if (idToken) {
-          await fetch(`${API_BASE}/api/refund`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-            body: JSON.stringify({ amount: creditCost, description: `Refund: enrollment failed for ${course?.title}` }),
-          });
-        }
-      }
-      toast.error("Failed to enroll.", { id: "enroll" });
-    }
-  };
+  }, [user?.uid, course?.id, isEnrolled]);
 
   const handleToggleWishlist = async () => {
     if (!user || !course) {
@@ -209,7 +151,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
         }).catch(async (e) => {
           if (e.code === 'not-found') {
             const { setDoc } = await import('firebase/firestore');
-            await setDoc(userRef, { wishlist: [course.id], savedCourses: [], progress: {}, credits: 0 });
+            await setDoc(userRef, { wishlist: [course.id], enrolledCourses: [], savedCourses: [] });
           } else {
             throw e;
           }
@@ -221,20 +163,6 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
       console.error("Failed to toggle wishlist", err);
       toast.error("Wishlist update failed");
     }
-  };
-
-  const handleQuizPassed = async (moduleId: string) => {
-    if (!user || !course) return;
-    setQuizPassedModuleIds((prev) => [...prev, moduleId]);
-    try {
-      await markQuizPassed(user.uid, course.id, moduleId, course.title);
-    } catch (err) {
-      console.error('Failed to record quiz pass', err);
-    }
-  };
-
-  const handleStartQuiz = (moduleId: string, quiz: Quiz) => {
-    setActiveQuiz({ moduleId, quiz });
   };
 
   const handleMarkDone = async (moduleId: string, moduleName: string) => {
@@ -293,7 +221,48 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
 
   const handleDownloadCertificate = () => {
     if (!user || !course) return;
-    generateCertificatePdf(user.displayName || 'Student', course.title);
+    const padding = 20;
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    doc.setFillColor(245, 245, 245);
+    doc.rect(0, 0, 297, 210, 'F');
+    doc.setLineWidth(2);
+    doc.setDrawColor(40, 40, 40);
+    doc.rect(padding, padding, 297 - 2 * padding, 210 - 2 * padding, 'S');
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(40);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Certificate of Completion", 148.5, 60, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(16);
+    doc.text("This is to certify that", 148.5, 90, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(30);
+    doc.text(user.displayName || 'Student', 148.5, 110, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(16);
+    doc.text("has successfully completed the course", 148.5, 130, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.setTextColor(50, 100, 200);
+    const titleLines = doc.splitTextToSize(course.title, 200);
+    doc.text(titleLines, 148.5, 150, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(14);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Date of Completion: ${new Date().toLocaleDateString()}`, 148.5, 175, { align: "center" });
+
+    doc.save(`Certificate_${course.title.replace(/\s+/g, '_')}.pdf`);
   };
 
   const totalMod = moduleList.length || course?.totalModules || 8;
@@ -321,12 +290,6 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
           <Helmet>
             <title>{course.title} | Guidenza</title>
             <meta name="description" content={course.description} />
-            <meta property="og:title" content={`${course.title} | Guidenza`} />
-            <meta property="og:description" content={course.description} />
-            <meta property="og:type" content="product" />
-            {course.thumbnail && <meta property="og:image" content={course.thumbnail} />}
-            {course.price > 0 && <meta property="product:price:amount" content={String(course.price)} />}
-            <meta property="product:price:currency" content="USD" />
           </Helmet>
           <motion.div
             initial={{ opacity: 0 }}
@@ -417,6 +380,8 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                   <PurchaseGate
                     courseId={course.id}
                     amount={course.price}
+                    purchased={purchased || isEnrolled}
+                    checking={purchaseChecking}
                     preview={
                       <div className="flex flex-col gap-2">
                         {moduleList.slice(0, 1).map((mod) => (
@@ -436,9 +401,7 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                       <div className="flex flex-col gap-2">
                         {moduleList.map((mod) => {
                           const done = completedModuleIds.includes(mod.id);
-                          const quizPassed = quizPassedModuleIds.includes(mod.id);
                           const loading = markingDone === mod.id;
-                          const quizzes = moduleQuizzes[mod.id];
                           return (
                             <div
                               key={mod.id}
@@ -462,18 +425,15 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                               >
                                 {mod.title}
                               </span>
-                              <div className="flex items-center gap-2">
-                                {done && quizzes && quizzes.length > 0 && !quizPassed && (
-                                  <button
-                                    onClick={() => handleStartQuiz(mod.id, quizzes[0])}
-                                    className="text-xs text-foreground border border-white/20 rounded-lg px-3 py-1 hover:bg-white/10 transition-colors"
-                                  >
-                                    Quiz
-                                  </button>
-                                )}
-                                {quizPassed && (
-                                  <span className="text-xs text-green-400 font-medium">Quiz passed</span>
-                                )}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => setTutorOpen({ moduleId: mod.id })}
+                                  className="text-xs text-muted-foreground/50 border border-white/10 rounded-lg px-2 py-1 hover:text-purple-400 hover:border-purple-500/30 transition-colors flex items-center gap-1"
+                                  title="I'm stuck - get AI help"
+                                >
+                                  <Sparkles size={10} />
+                                  Stuck
+                                </button>
                                 {!done && (
                                   <button
                                     onClick={() => handleMarkDone(mod.id, mod.title)}
@@ -491,32 +451,6 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                     }
                   />
                 </div>
-
-                {/* QuizViewer sub-modal */}
-                {activeQuiz && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
-                    onClick={() => setActiveQuiz(null)}
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="bg-background border border-white/10 rounded-3xl w-full max-w-lg max-h-[80dvh] overflow-y-auto p-6 shadow-2xl custom-scrollbar"
-                    >
-                      <QuizViewer
-                        courseId={course.id}
-                        moduleId={activeQuiz.moduleId}
-                        quiz={activeQuiz.quiz}
-                        onQuizPassed={() => handleQuizPassed(activeQuiz.moduleId)}
-                        onClose={() => setActiveQuiz(null)}
-                      />
-                    </motion.div>
-                  </motion.div>
-                )}
 
                 <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-background/95 backdrop-blur-sm border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 mt-4 z-10">
                   {!isEnrolled && !purchased && (
@@ -616,6 +550,22 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
                     )}
                   </div>
                 </div>
+
+                {tutorOpen && (
+                  <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-background border border-white/10 rounded-2xl w-full max-w-lg">
+                      <div className="p-4">
+                        <AITutor
+                          courseId={course.id}
+                          moduleId={tutorOpen.moduleId}
+                          moduleTitle={moduleList.find(m => m.id === tutorOpen.moduleId)?.title ?? ''}
+                          initialQuestion={tutorOpen.question}
+                          onClose={() => setTutorOpen(null)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

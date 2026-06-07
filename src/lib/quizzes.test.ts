@@ -83,52 +83,19 @@ describe('QuizQuestion explanation field', () => {
   });
 });
 
-describe('deleteQuiz cascade', () => {
+describe('deleteQuiz', () => {
   beforeEach(() => {
-    firebaseMock.batchOps.length = 0;
-    firebaseMock.mockBatch.delete.mockClear();
-    firebaseMock.mockBatch.commit.mockClear();
     vi.clearAllMocks();
   });
 
-  it('deletes the quiz document and all matching attempts in a single batch', async () => {
-    const { getDocs, collectionGroup } = await import('firebase/firestore');
-    const fakeAttemptRefs = [
-      { id: 'a1', path: 'users/u1/quizAttempts/a1' },
-      { id: 'a2', path: 'users/u2/quizAttempts/a2' },
-      { id: 'a3', path: 'users/u3/quizAttempts/a3' },
-    ];
-    vi.mocked(getDocs).mockResolvedValueOnce({
-      docs: fakeAttemptRefs.map((ref) => ({ ref, data: () => ({}), id: ref.id })),
-      size: fakeAttemptRefs.length,
-      empty: false,
-    } as never);
+  it('deletes only the quiz document (no cross-user cascade)', async () => {
+    const { deleteDoc, doc } = await import('firebase/firestore');
 
     await deleteQuiz('c1', 'm1', 'q1');
 
-    expect(collectionGroup).toHaveBeenCalled();
-    const cgCalls = vi.mocked(collectionGroup).mock.calls;
-    expect(cgCalls.some((c) => c[1] === 'quizAttempts')).toBe(true);
-    expect(firebaseMock.mockBatch.delete).toHaveBeenCalledTimes(4);
-    const deletedPaths = firebaseMock.batchOps.map((op) => op.ref.path);
-    expect(deletedPaths).toContain('courses/c1/modules/m1/quizzes/q1');
-    expect(deletedPaths).toContain('users/u1/quizAttempts/a1');
-    expect(deletedPaths).toContain('users/u2/quizAttempts/a2');
-    expect(deletedPaths).toContain('users/u3/quizAttempts/a3');
-    expect(firebaseMock.mockBatch.commit).toHaveBeenCalledTimes(1);
-  });
-
-  it('still commits the batch when there are no attempts to delete', async () => {
-    const { getDocs } = await import('firebase/firestore');
-    vi.mocked(getDocs).mockResolvedValueOnce({
-      docs: [],
-      size: 0,
-      empty: true,
-    } as never);
-
-    await deleteQuiz('c1', 'm1', 'q1');
-
-    expect(firebaseMock.mockBatch.delete).toHaveBeenCalledTimes(1);
-    expect(firebaseMock.mockBatch.commit).toHaveBeenCalledTimes(1);
+    expect(deleteDoc).toHaveBeenCalledTimes(1);
+    const docCalls = vi.mocked(doc).mock.calls;
+    const lastCall = docCalls[docCalls.length - 1];
+    expect(lastCall.slice(1)).toEqual(['courses', 'c1', 'modules', 'm1', 'quizzes', 'q1']);
   });
 });
