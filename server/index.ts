@@ -12,13 +12,34 @@ app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use('/api/webhook', express.text({ type: '*/*' }));
 app.use('/api', express.json());
 
-app.post('/api/checkout', async (req, res) => {
+// Auth middleware: verify Firebase ID token
+async function verifyAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+  const idToken = authHeader.slice(7);
   try {
-    const { userId, courseId, amount, currency } = req.body;
-    if (!userId || !courseId || !amount) {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    req.auth = decoded;
+    next();
+  } catch (err) {
+    console.error('Auth verification failed:', err);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// Protected checkout endpoint - userId comes from auth token, not request body
+app.post('/api/checkout', verifyAuth, async (req, res) => {
+  try {
+    const auth = req.auth;
+    const { courseId, amount, currency } = req.body;
+    if (!courseId || !amount) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
+
+    const userId = auth.uid;
 
     // Create SafePay transaction
     const txn = await createTransaction({ userId, courseId, amount, currency: currency ?? 'PKR' });
@@ -54,11 +75,13 @@ app.post('/api/webhook/safepay', async (req, res) => {
   }
 });
 
-app.get('/api/orders/:userId', async (req, res) => {
+// Protected orders endpoint - user can only see their own orders
+app.get('/api/orders', verifyAuth, async (req, res) => {
   try {
+    const auth = req.auth;
     const snapshot = await db
       .collection('orders')
-      .where('userId', '==', req.params.userId)
+      .where('userId', '==', auth.uid)
       .orderBy('createdAt', 'desc')
       .get();
 

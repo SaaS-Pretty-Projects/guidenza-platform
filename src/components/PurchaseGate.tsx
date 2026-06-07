@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { usePurchase } from '../hooks/usePurchase';
 import { CheckoutButton } from './CheckoutButton';
 
 interface PurchaseGateProps {
@@ -8,11 +7,11 @@ interface PurchaseGateProps {
   currency?: string;
   preview: ReactNode;
   full: ReactNode;
+  purchased: boolean;
+  checking: boolean;
 }
 
-export function PurchaseGate({ courseId, amount, currency, preview, full }: PurchaseGateProps) {
-  const { purchased, checking } = usePurchase(courseId, amount);
-
+export function PurchaseGate({ courseId, amount, currency, preview, full, purchased, checking }: PurchaseGateProps) {
   if (checking) {
     return (
       <div className="flex items-center justify-center p-8">
