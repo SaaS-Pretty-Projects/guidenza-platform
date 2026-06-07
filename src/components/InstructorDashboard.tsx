@@ -889,12 +889,14 @@ export function InstructorDashboard() {
                 </select>
               </div>
             )}
-            <QuizEditor
-              courseId={quizManagerCourse.id}
-              moduleId={(quizManagerCourse.modules ?? [])[selectedModuleIndex].id}
-              moduleTitle={(quizManagerCourse.modules ?? [])[selectedModuleIndex].title}
-              onClose={() => { setQuizManagerCourse(null); setSelectedModuleIndex(0); }}
-            />
+            <div key={(quizManagerCourse.modules ?? [])[selectedModuleIndex].id}>
+              <QuizEditor
+                courseId={quizManagerCourse.id}
+                moduleId={(quizManagerCourse.modules ?? [])[selectedModuleIndex].id}
+                moduleTitle={(quizManagerCourse.modules ?? [])[selectedModuleIndex].title}
+                onClose={() => { setQuizManagerCourse(null); setSelectedModuleIndex(0); }}
+              />
+            </div>
           </div>
         </div>
       )}
