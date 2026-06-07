@@ -60,29 +60,34 @@ export function CoursePreview({ course, onClose }: CoursePreviewProps) {
     if (user && course) {
       setPurchaseChecking(true);
       const checkUserData = async () => {
-        const userRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          const enrolledCourses: string[] = data.enrolledCourses || [];
-          const wishlist: string[] = data.wishlist || [];
-          const enrolled = enrolledCourses.includes(course.id);
-          setIsEnrolled(enrolled);
-          setIsWishlisted(wishlist.includes(course.id));
-          const purchasedCourses: string[] = data.purchasedCourses ?? [];
-          setPurchased(purchasedCourses.includes(course.id));
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const snap = await getDoc(userRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            const enrolledCourses: string[] = data.enrolledCourses || [];
+            const wishlist: string[] = data.wishlist || [];
+            const enrolled = enrolledCourses.includes(course.id);
+            setIsEnrolled(enrolled);
+            setIsWishlisted(wishlist.includes(course.id));
+            const purchasedCourses: string[] = data.purchasedCourses ?? [];
+            setPurchased(purchasedCourses.includes(course.id));
 
-          if (enrolled) {
-            const progress = await getProgressForCourse(user.uid, course.id);
-            const completed = progress?.completedModules ?? [];
-            setCompletedModuleIds(completed);
-            setCompletedModules(completed.length);
-          } else {
-            setCompletedModules(0);
-            setCompletedModuleIds([]);
+            if (enrolled) {
+              const progress = await getProgressForCourse(user.uid, course.id);
+              const completed = progress?.completedModules ?? [];
+              setCompletedModuleIds(completed);
+              setCompletedModules(completed.length);
+            } else {
+              setCompletedModules(0);
+              setCompletedModuleIds([]);
+            }
           }
+        } catch (err) {
+          console.error('Failed to check user data:', err);
+        } finally {
+          setPurchaseChecking(false);
         }
-        setPurchaseChecking(false);
       };
       checkUserData();
     } else {
