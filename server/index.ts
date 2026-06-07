@@ -38,7 +38,7 @@ async function requireCourseAccess(auth, courseId) {
   const courseDoc = await db.collection('courses').doc(courseId).get();
   if (courseDoc.exists) {
     const data = courseDoc.data();
-    if (data?.instructorId === auth.uid) return true;
+    if (data?.authorId === auth.uid || data?.instructorId === auth.uid) return true;
   }
   // Fallback: check Firestore user doc (covers free-course enrollees whose claims aren't set)
   const userDoc = await db.collection('users').doc(auth.uid).get();

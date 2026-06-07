@@ -27,6 +27,7 @@ export function AITutor({ courseId, moduleId, moduleTitle, initialQuestion, onCl
   const initialSentRef = useRef(false);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
